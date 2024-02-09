@@ -118,6 +118,8 @@ class PoisonedDataset_EBM(data.Dataset):
                 else:
                     input_purify = input
 
+                
+
                 if args.ebm_perturb_clamp is None:
                     input = inverse_ebm_norm(input_purify)
                 else: 
