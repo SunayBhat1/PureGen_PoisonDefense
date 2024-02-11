@@ -30,7 +30,7 @@ cifar_std_gm = (0.2471, 0.2435, 0.2616)
 # Data Loaders 
 #############
 
-def get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model, device, train_transform=None):
+def get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model, diff_model, scheduler, device, train_transform=None):
 
     if args.poison_mode == 'from_scratch':
         train_data_poisoned_base = Poisoned_Dataset_Base(args.data_dir,
@@ -66,6 +66,8 @@ def get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model,
     train_data_poisoned = PoisonedDataset_EBM(args, 
                                               base_loader_poisoned, 
                                               ebm_model, 
+                                              diff_model, 
+                                              scheduler,
                                               None if args.defense == 'EBM' and args.purify_freq > 0 else train_transform, 
                                               device, 
                                               n_steps=args.pre_purify_steps if args.defense == 'EBM' and args.purify_freq > 0 else None)
@@ -74,7 +76,7 @@ def get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model,
 
 class PoisonedDataset_EBM(data.Dataset):
 
-    def __init__(self, args, base_loader, ebm_model, transform, device, n_steps=None):
+    def __init__(self, args, base_loader, ebm_model,diff_model, scheduler, transform, device, n_steps=None):
         # Extract the features
         input_list, label_list, p_list, index_list = [], [], [], []
 
@@ -89,7 +91,7 @@ class PoisonedDataset_EBM(data.Dataset):
         else:
             self.transform = transform
 
-        if args.defense == 'EBM':
+        if args.defense in ['EBM','EBM_Diff']:
             if n_steps is None: 
                 if args.purify_freq > 0:
                     steps = args.pre_purify_steps
@@ -104,7 +106,7 @@ class PoisonedDataset_EBM(data.Dataset):
         # Iterate through the base loader
         for input, target, index, p in (base_loader):
             # If using EBM, purify the data
-            if args.defense == 'EBM':
+            if args.defense in ['EBM','EBM_Diff']:
                 input = forward_ebm_norm(input).to(device)
 
                 if steps > 0: 
@@ -117,7 +119,7 @@ class PoisonedDataset_EBM(data.Dataset):
                         ).squeeze(0)
                 else:
                     input_purify = input
-
+                    
                 
 
                 if args.ebm_perturb_clamp is None:
@@ -127,7 +129,17 @@ class PoisonedDataset_EBM(data.Dataset):
                     delta = inverse_ebm_norm(input_purify) - input 
                     clamped_delta = delta.clamp(-args.ebm_perturb_clamp/255, args.ebm_perturb_clamp/255) ## TODO COnfirm this!!!!
                     input = input + clamped_delta
-            
+
+            if args.defense in ['Diff','EBM_Diff']:
+                
+                sample = input.to(device)
+                for t in scheduler.timesteps:
+                    with torch.no_grad(): residual = diff_model(sample, t).sample
+                    sample = scheduler.step(residual, t, sample).prev_sample
+                    xm.mark_step()
+
+                input = sample
+
             if args.purify_reps_mode == 'repeat':
                 target = target.repeat(args.purify_reps)
                 p = p.repeat(args.purify_reps)
