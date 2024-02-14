@@ -7,7 +7,7 @@
   "clip_sample": true,
   "clip_sample_range": 1.0,
   "dynamic_thresholding_ratio": 0.995,
-  "num_train_timesteps": 125,
+  "num_train_timesteps": 10,
   "prediction_type": "epsilon",
   "rescale_betas_zero_snr": false,
   "sample_max_value": 1.0,

@@ -61,7 +61,7 @@ def main(rank, args):
     # Setup EBM
     ##############################
 
-    if args.defense == 'EBM':
+    if args.defense in ['EBM','EBM_Diff']:
         ebm_model = get_ebm(args, device)
     else:
         ebm_model = None
@@ -76,10 +76,10 @@ def main(rank, args):
         diff_model = UNet2DModel.from_pretrained(diff_model_id).to(device)
 
         diff_scheduler = DDPMScheduler.from_pretrained(diff_model_id)
-        diff_scheduler.config['num_train_timesteps'] = 125  # Reduced number of diffusion steps
-        diff_scheduler.config['beta_start'] = 0.00001  # Starting noise level
-        diff_scheduler.config['beta_end'] = 0.00002  # You may need to adjust this based on performance
-        diff_scheduler.config['beta_schedule'] = 'linear'  # Consider experimenting with 'cosine' or custom schedules
+        diff_scheduler.config['num_train_timesteps'] = args.diff_steps  # Reduced number of diffusion steps
+        diff_scheduler.config['beta_start'] = args.diff_beta_start # 0.00001  Starting noise level
+        diff_scheduler.config['beta_end'] = args.diff_beta_end # 0.00002  You may need to adjust this based on performance
+        diff_scheduler.config['beta_schedule'] = args.diff_beta_scheduler # Consider experimenting with 'cosine' or custom schedules
         diff_scheduler.save_config("diff_scheduler")
         diff_scheduler = DDPMScheduler.from_pretrained("diff_scheduler")
     
@@ -369,6 +369,13 @@ if __name__ == '__main__':
     args_ebm.add_argument('--ebm_perturb_clamp', default=None, type=int,help='clamp for EBM perturbation')
     args_ebm.add_argument('--purify_freq', default=0, type=int, help="Whether to use the penultimate features for training (default: False)")
     args_ebm.add_argument('--pre_purify_steps', default=100, type=int, help='number of pre purification steps only if purify_freq > 0')
+
+    ### Diffusion Arguments ###
+    args_diff = parser.add_argument_group('Diffusion')
+    args_diff.add_argument('--diff_steps', default=125, type=int, help='number of diffusion steps')
+    args_diff.add_argument('--diff_beta_start', default=0.00001, type=float, help='starting noise level')
+    args_diff.add_argument('--diff_beta_end', default=0.00002, type=float, help='ending noise level')
+    args_diff.add_argument('--diff_beta_scheduler', default='linear', type=str, choices=['linear','cosine'], help='diffusion beta scheduler')
 
     ### Other Defense and Poison Arguments ###
     parser.add_argument('--iters_bp', default=800, type=int,help='iterations for making poison')

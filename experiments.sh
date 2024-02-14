@@ -63,6 +63,14 @@ do
     python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None' --start_target_index $i;
 done
 
+for j in 10 25 50 100 150
+    do
+    for i in 0 8
+    do
+        python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'Diff' --start_target_index $i --diff_steps $j;
+        python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM_Diff' --start_target_index $i --diff_steps $j;
+    done
+done
 
 
 
