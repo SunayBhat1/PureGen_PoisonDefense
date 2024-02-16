@@ -33,14 +33,16 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
 
     if args.poison_Narcissus:
 
-        train_data, poison_indices_all = get_data(args.dataset, args.data_dir,True,False,args.poison_Narcissus,args.poison_amount)
+        train_data, poison_indices_all = get_train_data(args.dataset, args.data_dir,True,False,args.poison_Narcissus,args.poison_amount)
         if args.verbose: xm.master_print(f'Len poison indices: {len(poison_indices_all)}, num unique: {len(np.unique(poison_indices_all))}')
         # Save poison indices
         if xm.is_master_ordinal():
             torch.save(poison_indices_all,os.path.join(args.output_dir,f'poison_indices.pt'))
     
     else:
-        train_data = get_data(args.dataset, args.data_dir,True,False)
+        train_data = get_train_data(args.dataset, args.data_dir,True,False)
+
+    test_data = get_test_data(args.dataset, args.data_dir)
 
 
 
@@ -50,12 +52,12 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
     # Creates a sampler for distributing the data across all TPU cores for training, and a separate sampler for the persistent bank, and a separate sampler for the FID calculation
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_data,num_replicas=xm.xrt_world_size(),rank=xm.get_ordinal(), shuffle=True)
     bank_sampler = torch.utils.data.distributed.DistributedSampler(train_data,num_replicas=xm.xrt_world_size(),rank=xm.get_ordinal(),shuffle=True)
-    fid_sampler = torch.utils.data.distributed.DistributedSampler(train_data,num_replicas=xm.xrt_world_size(),rank=xm.get_ordinal(),shuffle=True)
+    fid_sampler = torch.utils.data.distributed.DistributedSampler(test_data,num_replicas=xm.xrt_world_size(),rank=xm.get_ordinal(),shuffle=True)
 
     # Creates dataloaders, which load data in batches
     train_loader = DataLoader(train_data,batch_size=args.batch_size,sampler=train_sampler,num_workers=args.num_workers,drop_last=True)
     bank_loader = DataLoader(train_data,batch_size=args.batch_size,sampler=bank_sampler,num_workers=args.num_workers,drop_last=True)
-    fid_loader = DataLoader(train_data,batch_size=args.batch_size,sampler=fid_sampler,num_workers=args.num_workers,drop_last=True)
+    fid_loader = DataLoader(test_data,batch_size=args.batch_size,sampler=fid_sampler,num_workers=args.num_workers,drop_last=True)
 
     # Create persistent image bank
     image_bank = initialize_persistent(args.image_dims, args.persistent_size, bank_loader, args.data_epsilon, device, poisoned = args.poison_Narcissus)

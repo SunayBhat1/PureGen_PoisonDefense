@@ -1,9 +1,15 @@
 
 import torch
 from torchvision import datasets, transforms as tr
-import torch_xla.core.xla_model as xm
+try:
+    import torch_xla.core.xla_model as xm
+except:
+    pass
 from torch.utils.data import DataLoader, Dataset, Subset
-import pytorch_fid.fid_score as fid_score
+try:
+    import pytorch_fid.fid_score as fid_score
+except:
+    pass
 import torchvision
 import torchvision.transforms as transforms
 import torch.utils.data as data
@@ -20,41 +26,56 @@ from tqdm import tqdm
 # General Utils
 #############
 
-# cinic10_mean = np.array([0.47889522, 0.47227842, 0.43047404])
-# cinic10_std = np.array([0.24205776, 0.23828046, 0.25874835])
+def get_train_data(dataset_type, data_dir, use_random_transform=False, poisoned=False, poison_amount=500):
 
-cifar10_mean = np.array([0.5, 0.5, 0.5])
-cifar10_std = np.array([0.5, 0.5, 0.5])
+    ##############
+    # Transforms #
+    ##############
 
-def get_data(dataset_type, data_dir, train=True, use_random_transform=False, poisoned=False, poison_amount=500):
+    # Adjust the randomecrop size and the mean and std for the dataset
+    if dataset_type in ['cifar10', 'cifar10_BP', 'cifar10_GM', 'cifar10_45K', 'cinic10', 'cincic10_imagenet_subset']:
+        random_crop_size = 32
+        norm_mean = np.array([0.5, 0.5, 0.5])
+        norm_std = np.array([0.5, 0.5, 0.5])
+    elif dataset_type == 'mnist':
+        random_crop_size = 28
+        norm_mean = np.array([0.5])
+        norm_std = np.array([0.5])
+
+    transform = []
 
     if use_random_transform:
-        transform = tr.Compose([
-            tr.RandomCrop(32, padding=4),
-            tr.RandomHorizontalFlip(),
-            tr.ToTensor(),
-            tr.Normalize(cifar10_mean, cifar10_std),
-        ])
-    else:
-        transform = tr.Compose([tr.ToTensor(), tr.Normalize(cifar10_mean, cifar10_std)])
+        transform.append(tr.RandomCrop(random_crop_size, padding=4))
+        if dataset_type == 'mnist': transform.append(tr.Resize((32, 32)))
+        transform.append(tr.RandomHorizontalFlip())
+    
+    transform.append(tr.ToTensor())
+    transform.append(tr.Normalize(norm_mean, norm_std))
 
+    transform = tr.Compose(transform)
+
+    ##############
+    # Load Data  #
+    ##############
+
+    # Not Poisoned
     if not poisoned:
 
         if dataset_type == 'cifar10':
-            dataset = datasets.CIFAR10(data_dir, train=train, download=True, transform=transform)
+            dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=transform)
 
         elif dataset_type == 'cifar10_BP':
             train_list = torch.load(os.path.join(data_dir, 'CIFAR10_TRAIN_Split.pth'))['clean_train']
             dataset = SubsetOfList(train_list, transform=transform, start_idx=0, end_idx=4800)
 
         elif dataset_type == 'cifar10_GM':
-            gm_used_indices = np.load(os.path.join(data_dir,'Poisons/gm_used_indices.npy'))
-            dataset = datasets.CIFAR10(data_dir, train=train, download=True, transform=transform)
+            gm_used_indices = np.load('/Users/sunaybhat/Documents/GitHub/data/data_EBM_Defense/models/ebms/indices_gm_used.npy')
+            dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=transform)
             dataset.data = np.delete(dataset.data, gm_used_indices, axis=0)
             dataset.targets = np.delete(dataset.targets, gm_used_indices, axis=0)
 
         elif dataset_type == 'cifar10_45K':
-            dataset = datasets.CIFAR10(data_dir, train=train, download=True, transform=transform)
+            dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=transform)
             dataset.data = dataset.data[0:45000]
             dataset.targets = dataset.targets[0:45000]
 
@@ -64,24 +85,13 @@ def get_data(dataset_type, data_dir, train=True, use_random_transform=False, poi
 
         elif dataset_type == 'cincic10_imagenet_subset':
                 
-                dataset = datasets.ImageFolder(os.path.join(data_dir, 'CINIC-10/train'), transform=transform)
-                cifar_idxs = [idx for idx, (path, label) in enumerate(dataset.samples) if 'cifar10' not in path]
+            dataset = datasets.ImageFolder(os.path.join(data_dir, 'CINIC-10/train'), transform=transform)
+            cifar_idxs = [idx for idx, (path, label) in enumerate(dataset.samples) if 'cifar10' not in path]
 
-                dataset = Subset(dataset, cifar_idxs)
+            dataset = Subset(dataset, cifar_idxs)
 
         elif dataset_type == 'mnist':
-
-            if use_random_transform:
-                transform = tr.Compose([
-                    tr.RandomCrop(28, padding=4),
-                    tr.Resize((32, 32), antialias=True),
-                    tr.ToTensor(),
-                    tr.Normalize((0.5,), (0.5,)),
-                ])
-            else:
-                transform = tr.Compose([tr.ToTensor(), tr.Resize((32, 32), antialias=True), tr.Normalize((0.5,), (0.5,))])
-
-            dataset = datasets.MNIST(data_dir, train=train, download=True, transform=transform)
+            dataset = datasets.MNIST(data_dir, train=True, download=True, transform=transform)
         else:
             raise NotImplementedError
         
@@ -99,11 +109,54 @@ def get_data(dataset_type, data_dir, train=True, use_random_transform=False, poi
             poison_tuples_all, poison_indices_all = get_poisoned_subset_cifar10_narcissus(data_dir, poison_amount, cifar=False)
             cifar = False
 
+        else:
+            raise NotImplementedError
+
         dataset = Poisoned_Dataset(data_dir, transform=transform, num_per_label=9000,
                                     poison_tuple_list=poison_tuples_all, poison_indices=poison_indices_all,
                                     cifar=cifar)
     
         return dataset, poison_indices_all
+    
+def get_test_data(dataset_type, data_dir):
+
+    ##############
+    # Transforms #
+    ##############
+
+    # Adjust the randomecrop size and the mean and std for the dataset
+    if dataset_type in ['cifar10', 'cifar10_BP', 'cifar10_GM', 'cifar10_45K', 'cinic10', 'cincic10_imagenet_subset']:
+        norm_mean = np.array([0.5, 0.5, 0.5])
+        norm_std = np.array([0.5, 0.5, 0.5])
+    elif dataset_type == 'mnist':
+        norm_mean = np.array([0.5])
+        norm_std = np.array([0.5])
+
+    transform = tr.Compose([tr.ToTensor(), tr.Normalize(norm_mean, norm_std)])
+
+    ##############
+    # Load Data  #
+    ##############
+
+    if dataset_type in ['cifar10', 'cifar10_BP', 'cifar10_GM', 'cifar10_45K']:
+        dataset = datasets.CIFAR10(data_dir, train=False, download=True, transform=transform)
+
+    elif dataset_type == 'cinic10':
+        dataset = datasets.ImageFolder(os.path.join(data_dir, 'CINIC-10/test'), transform=transform)
+
+    elif dataset_type == 'cincic10_imagenet_subset':
+            
+            dataset = datasets.ImageFolder(os.path.join(data_dir, 'CINIC-10/test'), transform=transform)
+            cifar_idxs = [idx for idx, (path, label) in enumerate(dataset.samples) if 'cifar10' not in path]
+
+            dataset = Subset(dataset, cifar_idxs)
+
+    elif dataset_type == 'mnist':
+        dataset = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
+    else:
+        raise NotImplementedError
+    
+    return dataset
 
 
 class SubsetOfList(Dataset):

@@ -56,7 +56,13 @@ python3 run.py --remote_user 'sunaybhat' --poison_type 'BullseyePolytope_Bench' 
 
 ### Node 9 timing 
 
-
+for i in 0 8
+do
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'Diff' --start_target_index $i;
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM' --start_target_index $i;
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM_Diff' --start_target_index $i;
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None' --start_target_index $i;
+done
 
 ############################
 # Setup Node and Copy Data #
