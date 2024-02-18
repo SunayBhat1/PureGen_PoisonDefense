@@ -44,8 +44,6 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
 
     test_data = get_test_data(args.dataset, args.data_dir)
 
-
-
     if args.verbose: xm.master_print(f'Dataset {args.dataset} loaded with {len(train_data)} images.')
  
     if args.verbose: xm.master_print('Setting up data loaders...')

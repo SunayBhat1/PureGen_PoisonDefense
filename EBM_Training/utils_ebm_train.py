@@ -41,6 +41,10 @@ def get_train_data(dataset_type, data_dir, use_random_transform=False, poisoned=
         random_crop_size = 28
         norm_mean = np.array([0.5])
         norm_std = np.array([0.5])
+    elif dataset_type in ['tiny_imagenet', 'stl10']:
+        random_crop_size = 64
+        norm_mean = np.array([0.5, 0.5, 0.5])
+        norm_std = np.array([0.5, 0.5, 0.5])
 
     transform = []
 
@@ -92,6 +96,11 @@ def get_train_data(dataset_type, data_dir, use_random_transform=False, poisoned=
 
         elif dataset_type == 'mnist':
             dataset = datasets.MNIST(data_dir, train=True, download=True, transform=transform)
+
+        elif dataset_type == 'tiny_imagenet':
+            dataset = datasets.ImageFolder(os.path.join(data_dir, 'tiny-imagenet-200/train'), transform=transform)
+        elif dataset_type == 'stl10':
+            dataset = datasets.STL10(data_dir, split='unlabeled', download=True, transform=transform)
         else:
             raise NotImplementedError
         
@@ -125,7 +134,7 @@ def get_test_data(dataset_type, data_dir):
     ##############
 
     # Adjust the randomecrop size and the mean and std for the dataset
-    if dataset_type in ['cifar10', 'cifar10_BP', 'cifar10_GM', 'cifar10_45K', 'cinic10', 'cincic10_imagenet_subset']:
+    if dataset_type in ['cifar10', 'cifar10_BP', 'cifar10_GM', 'cifar10_45K', 'cinic10', 'cincic10_imagenet_subset', 'tiny_imagenet', 'stl10']:
         norm_mean = np.array([0.5, 0.5, 0.5])
         norm_std = np.array([0.5, 0.5, 0.5])
     elif dataset_type == 'mnist':
@@ -153,11 +162,15 @@ def get_test_data(dataset_type, data_dir):
 
     elif dataset_type == 'mnist':
         dataset = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
+    
+    elif dataset_type == 'tiny_imagenet':
+        dataset = datasets.ImageFolder(os.path.join(data_dir, 'tiny-imagenet-200/val'), transform=transform)
+    elif dataset_type == 'stl10':
+        dataset = datasets.STL10(data_dir, split='test', download=True, transform=transform)
     else:
         raise NotImplementedError
     
     return dataset
-
 
 class SubsetOfList(Dataset):
     def __init__(self, img_label_list, transform=None, start_idx=0, end_idx=1e10,
@@ -245,8 +258,6 @@ def plot_checkpoint(ebm_loss, grad_norm, image_samples, epoch, save_path, channe
         all_images = (np.clip(all_images, -1., 1.) + 1) / 2
         axs[1].imshow(all_images.transpose(1, 2, 0))
         
-
-
     axs[1].axis('off')
     axs[1].set_title(f'Shortrun Image Samples', fontsize=16, fontweight='bold')
 

@@ -9,10 +9,9 @@ import torch.nn.init as init
 import math
 
 
-
-def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False):
+def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,penul_features=512):
     if model_name == 'ResNet18': 
-        model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn)
+        model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn, penul_features=penul_features)
     elif model_name == 'MobileNetV2':
         model = MobileNetV2(num_classes=num_classes)
     elif model_name == 'DenseNet121':
@@ -206,6 +205,7 @@ class ResNet18Style(nn.Module):
         middle_feat_num=1,
         eval_bn=False,
         grad_bn=False,
+        penul_features=512,
     ):
         super(ResNet18Style, self).__init__()
         self.in_planes = 64
@@ -276,7 +276,7 @@ class ResNet18Style(nn.Module):
             bdp=bdp,
             eval_bn=eval_bn,
         )
-        self.linear = nn.Linear(512 * block.expansion, num_classes)
+        self.linear = nn.Linear(penul_features * block.expansion, num_classes)
 
         self.test_dp = test_dp
         self.middle_feat_num = middle_feat_num
