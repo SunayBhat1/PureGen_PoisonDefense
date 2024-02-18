@@ -22,6 +22,12 @@
 ### Node1 Base: Testing
 
 
+### Node 8: Train STL EBM
+python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
+
+### Node 9 Train STL R18 Classifier
+python3 run.py --dataset 'stl10'
+
 ####################
 # Core Experiments #
 ####################
@@ -99,7 +105,7 @@ ssh sunaybhat@node1_Base 'rm -rf /home/sunaybhat/results_EBM_Defense';
 (
 # Clone 
 mkdir data;
-git clone https://github.com/SunayBhat1/EBM_Poison_Defense
+git clone https://github.com/SunayBhat1/EBM_Diff_Poison_Defense
 # Create a data dir
 pip install tqdm;
 pip install pandas;
