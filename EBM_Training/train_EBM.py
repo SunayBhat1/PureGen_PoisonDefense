@@ -99,8 +99,11 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
 
             if args.poison_Narcissus:
                 (X_batch, y_batch, _, _) = batch
+            elif args.dataset == 'stl10':
+                X_batch = batch[0]
             else:
                 (X_batch, y_batch) = batch
+
 
             # obtain positive samples from data
             X_train = X_batch.to(device)
@@ -168,7 +171,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='EBM Training')
 
     # EBM Type and Dataset
-    parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',choices=['cifar10','cinic10','cifar10_BP','cifar10_GM','cifar10_45K','cinic10','mnist','cincic10_imagenet_subset'], help='Dataset to train on')
+    parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',choices=['stl10','cifar10','cinic10','cifar10_BP','cifar10_GM','cifar10_45K','cinic10','mnist','cincic10_imagenet_subset'], help='Dataset to train on')
     parser.add_argument('--image_dims', default=[3,32,32], nargs='+', type=int, metavar='N')
     parser.add_argument('--ebm', type=str, default='EBMSNGAN32', metavar='N',choices=['EBM_Small', 'EBMSNGAN32', 'EBMSNGAN128', 'EBMSNGAN256'])
     parser.add_argument('--num_filters', type=int, default=128, metavar='N')
