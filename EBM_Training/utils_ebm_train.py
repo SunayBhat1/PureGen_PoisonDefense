@@ -361,7 +361,7 @@ def fid_score_calculation(ebm, fid_loader, device, epoch, args, mcmc_steps, save
                 plot_images_data = np.block([[images_data[i*4+j,:,:,:].detach().cpu().numpy() for j in range(4)] for i in range(4)])
                 plot_images_sample = np.block([[images_sample[i*4+j,:,:,:].detach().cpu().numpy() for j in range(4)] for i in range(4)])
 
-        if batch_num == 100:
+        if batch_num == 60:
             break
 
         images_data_cpu = xm.all_gather(images_data, 0).cpu()
