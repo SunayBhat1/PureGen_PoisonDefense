@@ -96,7 +96,7 @@ done
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/Research/data_EBM_Defense/* sunaybhat@node1_Base:/home/sunaybhat/data/
 
 # Copy EBM Data down to local
-rsync -av --exclude='.DS_Store' sunaybhat@node6e:/home/sunaybhat/models/ebm/* /Users/sunaybhat/Documents/GitHub/models/ebm/
+rsync -av "sunaybhat@node6:/home/sunaybhat/models/ebms/*" /Users/sunaybhat/Documents/GitHub/models/ebm/
 
 # Copy Cifar10 Split Data
 scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth sunaybhat@Calt3_dani:/home/sunaybhat/data/;
