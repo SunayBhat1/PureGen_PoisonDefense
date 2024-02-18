@@ -93,11 +93,10 @@ scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth suna
 # Delete Results
 ssh sunaybhat@node1_Base 'rm -rf /home/sunaybhat/results_EBM_Defense';
 
-
 (
 # Clone 
 mkdir data;
-git clone https://github.com/SunayBhat1/EBM_Poison_Defense
+git clone https://github.com/SunayBhat1/EBM_Diff_Poison_Defense
 # Create a data dir
 pip install tqdm;
 pip install pandas;
