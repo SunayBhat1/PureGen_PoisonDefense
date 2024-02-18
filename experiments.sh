@@ -54,6 +54,8 @@ python3 run.py --remote_user 'sunaybhat' --poison_type 'BullseyePolytope_Bench' 
 # Experiments #
 ###############
 
+python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
+
 ### Node 1
 for i in 0 8
 do

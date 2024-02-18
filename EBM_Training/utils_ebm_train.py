@@ -41,8 +41,12 @@ def get_train_data(dataset_type, data_dir, use_random_transform=False, poisoned=
         random_crop_size = 28
         norm_mean = np.array([0.5])
         norm_std = np.array([0.5])
-    elif dataset_type in ['tiny_imagenet', 'stl10']:
+    elif dataset_type in ['tiny_imagenet']:
         random_crop_size = 64
+        norm_mean = np.array([0.5, 0.5, 0.5])
+        norm_std = np.array([0.5, 0.5, 0.5])
+    elif dataset_type in ['stl10']:
+        random_crop_size = 96
         norm_mean = np.array([0.5, 0.5, 0.5])
         norm_std = np.array([0.5, 0.5, 0.5])
 
