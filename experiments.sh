@@ -101,7 +101,6 @@ scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth suna
 # Delete Results
 ssh sunaybhat@node1_Base 'rm -rf /home/sunaybhat/results_EBM_Defense';
 
-
 (
 # Clone 
 mkdir data;
