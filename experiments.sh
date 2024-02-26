@@ -22,6 +22,12 @@
 ### Node1 Base: Testing
 
 
+### Node 8: Train STL EBM
+python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
+
+### Node 9 Train STL R18 Classifier
+python3 run.py --dataset 'stl10'
+
 ####################
 # Core Experiments #
 ####################
@@ -54,6 +60,8 @@ python3 run.py --remote_user 'sunaybhat' --poison_type 'BullseyePolytope_Bench' 
 # Experiments #
 ###############
 
+python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
+
 ### Node 1
 for i in 0 8
 do
@@ -72,16 +80,23 @@ for j in 175 200 250 500
     done
 done
 
-
+for i in 0 8
+do
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'Diff' --start_target_index $i;
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM' --start_target_index $i;
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM_Diff' --start_target_index $i;
+    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None' --start_target_index $i;
+done
 
 ############################
 # Setup Node and Copy Data #
 ############################
 
-# Copy Poisons/Models
+# Copy Poisons/Models Up to Node
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/Research/data_EBM_Defense/* sunaybhat@node1_Base:/home/sunaybhat/data/
 
-
+# Copy EBM Data down to local
+rsync -av "sunaybhat@node6:/home/sunaybhat/models/ebms/*" /Users/sunaybhat/Documents/GitHub/models/ebm/
 
 # Copy Cifar10 Split Data
 scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth sunaybhat@Calt3_dani:/home/sunaybhat/data/;
@@ -89,11 +104,10 @@ scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth suna
 # Delete Results
 ssh sunaybhat@node1_Base 'rm -rf /home/sunaybhat/results_EBM_Defense';
 
-
 (
 # Clone 
 mkdir data;
-git clone https://github.com/SunayBhat1/EBM_Poison_Defense
+git clone https://github.com/SunayBhat1/EBM_Diff_Poison_Defense
 # Create a data dir
 pip install tqdm;
 pip install pandas;
