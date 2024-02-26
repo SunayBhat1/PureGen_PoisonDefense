@@ -63,7 +63,7 @@ do
     python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None' --start_target_index $i;
 done
 
-for j in 10 25 50 100 150
+for j in 175 200 250 500
     do
     for i in 0 8
     do
