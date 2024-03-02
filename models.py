@@ -12,6 +12,10 @@ import math
 def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,penul_features=512):
     if model_name == 'ResNet18': 
         model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn, penul_features=penul_features)
+    elif model_name == 'ResNet18_Basic':
+        model = ResNet18_Basic()
+    elif model_name == 'HLB':
+        model = make_hlb_net()
     elif model_name == 'MobileNetV2':
         model = MobileNetV2(num_classes=num_classes)
     elif model_name == 'DenseNet121':
@@ -757,7 +761,192 @@ class NFNet(nn.Module):
         return out
 
 
+################
+# ResNet18_Basic #
+################
+
+'''ResNet in PyTorch.
+Reference:
+[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
+    Deep Residual Learning for Image Recognition. arXiv:1512.03385
+'''
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class BasicBlock_Basic(nn.Module):
+
+    def __init__(self, in_planes, planes, stride=1):
+        super(BasicBlock_Basic, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride,
+                               padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1,
+                               padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, planes, kernel_size=1,
+                          stride=stride, bias=False),
+                nn.BatchNorm2d(planes))
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        return F.relu(out)
+
+class ResNet_Basic(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super(ResNet_Basic, self).__init__()
+
+        widths = [64, 128, 256, 512]
+
+        self.in_planes = widths[0]
+        self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1,
+                               padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(self.in_planes)
+        self.layer1 = self._make_layer(block, widths[0], num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, widths[1], num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, widths[2], num_blocks[2], stride=2)
+        self.layer4 = self._make_layer(block, widths[3], num_blocks[3], stride=2)
+        self.linear = nn.Linear(widths[3], num_classes)
+
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = F.avg_pool2d(out, 4)
+        pre_out = out.view(out.size(0), -1)
+        final = self.linear(pre_out)
+        return final
+
+def ResNet18_Basic(**kwargs):
+    return ResNet_Basic(BasicBlock_Basic, [2,2,2,2], **kwargs)
 
 
+#####################
+# HyoperLight Bench #
+#####################
 
+### Hyperparameters ###
+hyp = {
+    'opt': {
+        'train_epochs': 14.9,
+        'batch_size': 1024,
+        'lr': 11.6,                 # learning rate per 1024 examples
+        'momentum': 0.87,
+        'weight_decay': 0.0157,#157     # weight decay per 1024 examples (decoupled from learning rate)
+        'bias_scaler': 64.5,        # scales up learning rate (but not weight decay) for BatchNorm biases
+        'label_smoothing': 0.2,
+        'ema': {
+            'start_epochs': 4,
+            'decay_base': 0.95,
+            'decay_pow': 3.,
+            'every_n_steps': 5,
+        },
+        'whiten_bias_epochs': 3,    # how many epochs to train the whitening layer bias before freezing
+    },
+    'aug': {
+        'flip': True,
+        'translate': 2,
+    },
+    'net': {
+        'whitening': {
+            'kernel_size': 2,
+        },
+        'batchnorm_momentum': 0.7,
+        'base_width': 64,
+        'scaling_factor': 1/9,
+        'tta_level': 2,         # the level of test-time augmentation: 0=none, 1=mirror, 2=mirror+translate
+    },
+}
 
+### Network Components ###
+class HLB_Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+class HLB_Mul(nn.Module):
+    def __init__(self, scale):
+        super().__init__()
+        self.scale = scale
+    def forward(self, x):
+        return x * self.scale
+
+class HLB_BatchNorm(nn.BatchNorm2d):
+    def __init__(self, num_features, eps=1e-12, momentum=hyp['net']['batchnorm_momentum'],
+                 weight=False, bias=True):
+        super().__init__(num_features, eps=eps, momentum=1-momentum)
+        self.weight.requires_grad = weight
+        self.bias.requires_grad = bias
+        # Note that PyTorch already initializes the weights to one and bias to zero
+
+class HLB_Conv(nn.Conv2d):
+    def __init__(self, in_channels, out_channels, kernel_size=3, padding='same', bias=False):
+        super().__init__(in_channels, out_channels, kernel_size=kernel_size, padding=padding, bias=bias)
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        if self.bias is not None:
+            self.bias.data.zero_()
+        # Create an implicit residual via identity initialization
+        w = self.weight.data
+        torch.nn.init.dirac_(w[:w.size(1)])
+
+class HLB_ConvGroup(nn.Module):
+    def __init__(self, channels_in, channels_out):
+        super().__init__()
+        self.conv1 = HLB_Conv(channels_in,  channels_out)
+        self.pool = nn.MaxPool2d(2)
+        self.norm1 = HLB_BatchNorm(channels_out)
+        self.conv2 = HLB_Conv(channels_out, channels_out)
+        self.norm2 = HLB_BatchNorm(channels_out)
+        self.activ = nn.GELU()
+        # self.conv3 = Conv(channels_out, channels_out)
+        # self.norm3 = BatchNorm(channels_out)        
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.pool(x)
+        x = self.norm1(x)
+        x = self.activ(x)
+        x = self.conv2(x)
+        x = self.norm2(x)
+        x = self.activ(x)      
+        return x
+
+#### Network Definition ###
+
+def make_hlb_net():
+    widths = {
+        'block1': (1 * hyp['net']['base_width']), # 64  w/ width at base value
+        'block2': (4 * hyp['net']['base_width']), # 256 w/ width at base value
+        'block3': (4 * hyp['net']['base_width']), # 256 w/ width at base value
+    }
+    whiten_conv_width = 2 * 3 * hyp['net']['whitening']['kernel_size']**2
+    net = nn.Sequential(
+        HLB_Conv(3, whiten_conv_width, kernel_size=hyp['net']['whitening']['kernel_size'], padding=0),
+        HLB_BatchNorm(whiten_conv_width),
+        nn.GELU(),
+        HLB_ConvGroup(whiten_conv_width, widths['block1']),
+        HLB_ConvGroup(widths['block1'],  widths['block2']),
+        HLB_ConvGroup(widths['block2'],  widths['block3']),
+        nn.MaxPool2d(3),
+        HLB_Flatten(),
+        nn.Linear(widths['block3'], 10, bias=False),
+        HLB_Mul(hyp['net']['scaling_factor']),
+    )
+    return net

@@ -19,7 +19,9 @@
 ### Calt4_david
 ### Calt5_rez
 
-### Node1 Base: Testing
+### Node1 Base: Testing HLB Integrations
+python3 run.py --remote_user 'sunaybhat' --model 'ResNet18_Basic' --defense 'None' --num_proc 1 --v;
+
 
 
 ### Node 8: Train STL EBM

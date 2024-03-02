@@ -342,6 +342,7 @@ if __name__ == '__main__':
 
     ### Setup Arguments ###
     parser.add_argument('--remote_user', type=str, help='username for the remote server (TPU only, else pass in full directory args below)')
+    parser.add_argument('--num_proc', type=int, default=8, help='number of processes for TPU')
     parser.add_argument('--config_file', default='./Configs/config.ini', type=str, help='path to the config file')
     parser.add_argument('--config_override', default=None, type=str, help='use this to override the specific config settings with a ini section')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
@@ -351,11 +352,12 @@ if __name__ == '__main__':
 
     ### Experiment Arguments ###
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
-    parser.add_argument('--poison_type', default='Gradient_Matching', type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--fine_tune', default=False, action='store_true',help="Whether retrain the full model (fine-tuning) or just the linear layer (default: False)")
     parser.add_argument('--defense', default='EBM', type=str, choices=['None','EBM','Epic','Friendly','Diff','EBM_Diff'],help='type of defense to use')
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
+    parser.add_argument('--model', default='ResNet18', type=str, choices=['ResNet18','ResNet18_Basic','HLB','MobileNetV2','DenseNet121'],help='type of model to use')
 
     ### EBM Arguments ###
     args_ebm = parser.add_argument_group('EBM')
