@@ -18,6 +18,9 @@ try:
     import torch_xla.distributed.xla_multiprocessing as xmp
 except: pass
 
+from diffusers import UNet2DModel
+from diffusers import DDPMScheduler
+
 from models import load_model
 from utils.utils import *
 from utils.utils_data import *
@@ -58,10 +61,31 @@ def main(rank, args):
     # Setup EBM
     ##############################
 
-    if args.defense == 'EBM':
+    if args.defense in ['EBM','EBM_Diff']:
         ebm_model = get_ebm(args, device)
     else:
         ebm_model = None
+
+    ##############################
+    # Setup Diffusion Model
+    ##############################
+        
+    if args.defense in ['Diff','EBM_Diff']:
+
+        diff_model_id = "google/ddpm-cifar10-32"
+        diff_model = UNet2DModel.from_pretrained(diff_model_id).to(device)
+
+        diff_scheduler = DDPMScheduler.from_pretrained(diff_model_id)
+        diff_scheduler.config['num_train_timesteps'] = args.diff_steps  # Reduced number of diffusion steps
+        diff_scheduler.config['beta_start'] = args.diff_beta_start # 0.00001  Starting noise level
+        diff_scheduler.config['beta_end'] = args.diff_beta_end # 0.00002  You may need to adjust this based on performance
+        diff_scheduler.config['beta_schedule'] = args.diff_beta_scheduler # Consider experimenting with 'cosine' or custom schedules
+        diff_scheduler.save_config("diff_scheduler")
+        diff_scheduler = DDPMScheduler.from_pretrained("diff_scheduler")
+    
+    else:
+        diff_model = None
+        diff_scheduler = None
 
     ##############################
     # Load training data (and poisons/target)
@@ -80,7 +104,9 @@ def main(rank, args):
         xm.rendezvous('training end!')
         return
 
-    train_data_poisoned_ebm = get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model, device,
+    train_data_poisoned_ebm = get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model, 
+                                                        diff_model,diff_scheduler,
+                                                        device,
                                                     train_transform=train_transforms)
     
     poisoned_ebm_loader = torch.utils.data.DataLoader(train_data_poisoned_ebm, batch_size=args.batch_size, shuffle=True,num_workers=4)
@@ -316,6 +342,7 @@ if __name__ == '__main__':
 
     ### Setup Arguments ###
     parser.add_argument('--remote_user', type=str, help='username for the remote server (TPU only, else pass in full directory args below)')
+    parser.add_argument('--num_proc', type=int, default=8, help='number of processes for TPU')
     parser.add_argument('--config_file', default='./Configs/config.ini', type=str, help='path to the config file')
     parser.add_argument('--config_override', default=None, type=str, help='use this to override the specific config settings with a ini section')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
@@ -325,11 +352,12 @@ if __name__ == '__main__':
 
     ### Experiment Arguments ###
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
-    parser.add_argument('--poison_type', default='Gradient_Matching', type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--fine_tune', default=False, action='store_true',help="Whether retrain the full model (fine-tuning) or just the linear layer (default: False)")
-    parser.add_argument('--defense', default='EBM', type=str, choices=['None','EBM','Epic','Friendly'],help='type of defense to use')
+    parser.add_argument('--defense', default='EBM', type=str, choices=['None','EBM','Epic','Friendly','Diff','EBM_Diff'],help='type of defense to use')
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
+    parser.add_argument('--model', default='ResNet18', type=str, choices=['ResNet18','ResNet18_Basic','HLB','MobileNetV2','DenseNet121'],help='type of model to use')
 
     ### EBM Arguments ###
     args_ebm = parser.add_argument_group('EBM')
@@ -343,6 +371,13 @@ if __name__ == '__main__':
     args_ebm.add_argument('--ebm_perturb_clamp', default=None, type=int,help='clamp for EBM perturbation')
     args_ebm.add_argument('--purify_freq', default=0, type=int, help="Whether to use the penultimate features for training (default: False)")
     args_ebm.add_argument('--pre_purify_steps', default=100, type=int, help='number of pre purification steps only if purify_freq > 0')
+
+    ### Diffusion Arguments ###
+    args_diff = parser.add_argument_group('Diffusion')
+    args_diff.add_argument('--diff_steps', default=125, type=int, help='number of diffusion steps')
+    args_diff.add_argument('--diff_beta_start', default=0.00001, type=float, help='starting noise level')
+    args_diff.add_argument('--diff_beta_end', default=0.00002, type=float, help='ending noise level')
+    args_diff.add_argument('--diff_beta_scheduler', default='linear', type=str, choices=['linear','cosine'], help='diffusion beta scheduler')
 
     ### Other Defense and Poison Arguments ###
     parser.add_argument('--iters_bp', default=800, type=int,help='iterations for making poison')
