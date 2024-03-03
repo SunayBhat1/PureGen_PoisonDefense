@@ -42,22 +42,6 @@ def main(rank, args):
     if args.verbose: print(f'Running on {xm.get_ordinal()} with rank {rank} and target index {target_index} and rand {torch.rand(1)}')
 
     ##############################
-    # Load the target network, optimizer, and loss function
-    ##############################
-
-    # Load the target network
-    target_net = load_target_network(args,device)
-
-    # Optimizer
-    optimizer = get_optimizer(args,target_net)
-
-    # Scheduler
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay, gamma=0.1)
-
-    # Loss function
-    criterion = nn.CrossEntropyLoss()
-
-    ##############################
     # Setup EBM
     ##############################
 
@@ -109,7 +93,11 @@ def main(rank, args):
                                                         device,
                                                     train_transform=train_transforms)
     
-    poisoned_ebm_loader = torch.utils.data.DataLoader(train_data_poisoned_ebm, batch_size=args.batch_size, shuffle=True,num_workers=4)
+    if args.model in ['HLB','ResNet18_HLB']:
+        poisoned_ebm_loader = train_data_poisoned_ebm
+        if args.verbose: print(f'IMages Mean, std: {poisoned_ebm_loader.images.mean()}, {poisoned_ebm_loader.images.std()}')
+    else:
+        poisoned_ebm_loader = torch.utils.data.DataLoader(train_data_poisoned_ebm, batch_size=args.batch_size, shuffle=True,num_workers=4)
 
     if args.defense == 'Friendly':
         if args.poison_mode == 'from_scratch':
@@ -120,40 +108,82 @@ def main(rank, args):
                                                                     train_transform=transforms.Normalize(mean=cifar_mean, std=cifar_std))
         poisoned_ebm_loader_noaugs = torch.utils.data.DataLoader(train_data_poisoned_ebm_noaugs, batch_size=args.batch_size, shuffle=True,num_workers=4)
 
-    p_count = sum(p.sum().item() for _, _, _, p in poisoned_ebm_loader)  
-    if args.verbose: print(f'Loaded training data with {args.poison_type} poison, {p_count} samples , {p_count/len(poisoned_ebm_loader.dataset):.2%} poisoned, {len(poisoned_ebm_loader.dataset)} length')
+    p_count = sum(p.sum().item() for _, _, _, p in poisoned_ebm_loader) 
+    if args.model in ['HLB','ResNet18_HLB']:
+        if args.verbose: 
+            print(f'Loaded training data with {args.poison_type} poison, {p_count} samples , {p_count/len(poisoned_ebm_loader.images):.2%} poisoned, {len(poisoned_ebm_loader.images)} length')
+    else:
+        if args.verbose: 
+            print(f'Loaded training data with {args.poison_type} poison, {p_count} samples , {p_count/len(poisoned_ebm_loader.dataset):.2%} poisoned, {len(poisoned_ebm_loader.dataset)} length')
 
     
     ##############################
     # Load Test data (and poison target)
     ##############################
+            
 
-    if args.dataset == 'cifar10':
-        # The test set of clean CIFAR10
-        if args.device_type == 'xla': 
-            if os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py')):
-                test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=False, transform=test_transforms)
-            else: 
-                if xm.is_master_ordinal(): 
-                    test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=True, transform=test_transforms)
-                    xm.rendezvous('download end!')
-                else: 
-                    xm.rendezvous('download end!')
+    if args.model in ['HLB','ResNet18_HLB']:
+        test_loader = CifarLoader(None, train=False, batch_size=1000,path=args.data_dir)
+
+    else:
+
+        if args.dataset == 'cifar10':
+            # The test set of clean CIFAR10
+            if args.device_type == 'xla': 
+                if os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py')):
                     test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=False, transform=test_transforms)
-        else:     
-            test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=test_transforms)
-    elif args.dataset == 'cinic10': 
-        test_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'CINIC-10/test'), transform=test_transforms) 
-        cifar_test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=test_transforms)
-        cifar_test_loader = torch.utils.data.DataLoader(cifar_test_data, batch_size=128,num_workers=4)
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=128,num_workers=4)
-    
+                else: 
+                    if xm.is_master_ordinal(): 
+                        test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=True, transform=test_transforms)
+                        xm.rendezvous('download end!')
+                    else: 
+                        xm.rendezvous('download end!')
+                        test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=False, transform=test_transforms)
+            else:     
+                test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=test_transforms)
+        elif args.dataset == 'cinic10': 
+            test_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'CINIC-10/test'), transform=test_transforms) 
+            cifar_test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=test_transforms)
+            cifar_test_loader = torch.utils.data.DataLoader(cifar_test_data, batch_size=128,num_workers=4)
+        test_loader = torch.utils.data.DataLoader(test_data, batch_size=128,num_workers=4)
+        
     if args.poison_type == 'Narcissus':
         test_trigger_loaders = get_poisons_target(args, target_index, test_transforms, target_mask = target_mask_label)
     else:
         poison_target_image, target_orig_label = get_poisons_target(args, target_index, test_transforms)
 
-    if args.verbose: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_data)}')
+    if args.verbose: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.images)}')
+
+    ##############################
+    # Load the target network, optimizer, and loss function
+    ##############################
+
+    # Load the target network
+    target_net = load_target_network(args,device)
+
+    if args.verbose: print(f'Loaded target network {args.model} with num params: {sum(p.numel() for p in target_net.parameters())}')
+
+    # Optimizer
+    optimizer = get_optimizer(args,target_net)
+
+    # Scheduler
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay, gamma=0.1)
+
+    if args.model in ['HLB','ResNet18_HLB']:
+        total_train_steps = np.ceil(len(train_data_poisoned_ebm) * args.epochs)
+        lr_schedule = np.interp(np.arange(1+total_train_steps),
+                            [0, int(0.2 * total_train_steps), total_train_steps],
+                            [0.2, 1, 0]) # triangular learning rate schedule
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule.__getitem__)
+        if args.verbose: print(f'Loaded the HLB scheduler with {total_train_steps} steps')
+
+        # init_whitening_conv(target_net[0], poisoned_ebm_loader.images)
+
+    # Loss function
+    criterion = nn.CrossEntropyLoss()
+
+    if args.model == 'HLB':
+        criterion = nn.CrossEntropyLoss(label_smoothing=0.2)
 
     ##############################
     # Run the attack (Training Loop)
@@ -233,13 +263,21 @@ def main(rank, args):
             output = target_net(input)
 
             # Backward pass
-            optimizer.zero_grad()
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-
-            # Update logs
-            logs['train_loss'][-1] += loss.item()
+            if args.model in ['HLB','ResNet18_HLB']:
+                loss = F.cross_entropy(output, target, reduction='none')
+                logs['train_loss'][-1] += loss.mean().item()
+                # train_acc.append((outputs.detach().argmax(1) == labels).float().mean().item())
+                optimizer.zero_grad(set_to_none=True)
+                loss.sum().backward()
+                optimizer.step()
+                scheduler.step()
+            else:
+                optimizer.zero_grad()
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
+                # Update logs
+                logs['train_loss'][-1] += loss.item()
 
             if args.device_type == 'xla': xm.mark_step()
 
@@ -250,12 +288,15 @@ def main(rank, args):
         logs['train_loss'][-1] /= len(poisoned_ebm_loader)
         
         # Decay the learning rate
-        scheduler.step()
+        if args.model not in ['HLB','ResNet18_HLB']: scheduler.step()
         if args.device_type == 'xla': xm.mark_step()
 
         # Test the model for from_scratch attacks
         if args.poison_mode == 'from_scratch':
-            test_acc = get_test_acc(target_net, test_loader, device)
+            if args.model in ['HLB','ResNet18_HLB']:
+                test_acc = eval_HLB(target_net, test_loader, device)
+            else:
+                test_acc = get_test_acc(target_net, test_loader, device)
             logs['test_acc'][-1] = test_acc
             
             if args.dataset == 'cinic10':
@@ -349,6 +390,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=11, type=int,help='seed for reproducibility')
     parser.add_argument('--save_models', default=False, action='store_true',help="Whether to save the models")
     parser.add_argument('--exp_name', default=None, type=str,help='name of the experiment to append to the output dataframe')
+    parser.add_argument('--no_poison', default=False, action='store_true',help='whether to run the attack or not')
 
     ### Experiment Arguments ###
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
@@ -358,6 +400,11 @@ if __name__ == '__main__':
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
     parser.add_argument('--model', default='ResNet18', type=str, choices=['ResNet18','ResNet18_Basic','HLB','MobileNetV2','DenseNet121'],help='type of model to use')
+
+    ### HLB Arguments ###
+    parser.add_argument('--hlb_flip', default=True, action='store_false',help='whether to use flip in HLB')
+    parser.add_argument('--hlb_translate', default=4, type=int,help='whether to use translate in HLB')
+    parser.add_argument('--hlb_cutout', default=12, type=int,help='whether to use cutout in HLB')
 
     ### EBM Arguments ###
     args_ebm = parser.add_argument_group('EBM')
