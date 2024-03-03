@@ -63,14 +63,20 @@ def get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model,
         
     base_loader_poisoned = torch.utils.data.DataLoader(train_data_poisoned_base, batch_size=args.batch_size, shuffle=False,num_workers=4)
 
+
     train_data_poisoned = PoisonedDataset_EBM(args, 
-                                              base_loader_poisoned, 
-                                              ebm_model, 
-                                              diff_model, 
-                                              scheduler,
-                                              None if args.defense == 'EBM' and args.purify_freq > 0 else train_transform, 
-                                              device, 
-                                              n_steps=args.pre_purify_steps if args.defense == 'EBM' and args.purify_freq > 0 else None)
+                                            base_loader_poisoned, 
+                                            ebm_model, 
+                                            diff_model, 
+                                            scheduler,
+                                            None if args.defense == 'EBM' and args.purify_freq > 0 else train_transform, 
+                                            device, 
+                                            n_steps=args.pre_purify_steps if args.defense == 'EBM' and args.purify_freq > 0 else None)
+
+    if args.model in ['HLB','ResNet18_HLB']:
+        aug = {'flip': args.hlb_flip, 'translate': args.hlb_translate, 'cutout': args.hlb_cutout}
+        train_data_poisoned = CifarLoader(train_data_poisoned.data, train=True, batch_size=args.batch_size, aug=aug, device=device,no_poison=args.no_poison,path=args.data_dir)
+        
 
     return train_data_poisoned
 
@@ -333,6 +339,143 @@ class Trigger_Test_Dataset(data.Dataset):
     def __len__(self):
         return len(self.indices)
     
+### HLB Loader ###
+    
+def make_random_square_masks(inputs, size):
+    is_even = int(size % 2 == 0)
+    n,c,h,w = inputs.shape
+
+    # seed top-left corners of squares to cutout boxes from, in one dimension each
+    corner_y = torch.randint(0, h-size+1, size=(n,), device=inputs.device)
+    corner_x = torch.randint(0, w-size+1, size=(n,), device=inputs.device)
+
+    # measure distance, using the center as a reference point
+    corner_y_dists = torch.arange(h, device=inputs.device).view(1, 1, h, 1) - corner_y.view(-1, 1, 1, 1)
+    corner_x_dists = torch.arange(w, device=inputs.device).view(1, 1, 1, w) - corner_x.view(-1, 1, 1, 1)
+    
+    mask_y = (corner_y_dists >= 0) * (corner_y_dists < size)
+    mask_x = (corner_x_dists >= 0) * (corner_x_dists < size)
+
+    final_mask = mask_y * mask_x
+
+    return final_mask
+
+def batch_flip_lr(inputs):
+    flip_mask = (torch.rand(len(inputs), device=inputs.device) < 0.5).view(-1, 1, 1, 1)
+    return torch.where(flip_mask, inputs.flip(-1), inputs)
+
+def batch_crop(inputs, crop_size):
+    crop_mask = make_random_square_masks(inputs, crop_size)
+    cropped_batch = torch.masked_select(inputs, crop_mask)
+    return cropped_batch.view(inputs.shape[0], inputs.shape[1], crop_size, crop_size)
+
+def batch_translate(inputs, translate):
+    width = inputs.shape[-2]
+    padded_inputs = F.pad(inputs, (translate,)*4, 'reflect', value=0)
+    return batch_crop(padded_inputs, width)
+
+def batch_cutout(inputs, size):
+    cutout_masks = make_random_square_masks(inputs, size)
+    return inputs.masked_fill(cutout_masks, 0)
+   
+class CifarLoader:
+
+    def __init__(self, dataset, train=True, batch_size=500, aug=None, drop_last=None, shuffle=None, device=0,path=None,no_poison=False):
+
+        if train:
+            if no_poison:
+                dset = torchvision.datasets.CIFAR10(path, train=train,  download=(not os.path.exists(os.path.join(path, 'cifar-10-batches-py'))))
+                self.images = torch.tensor(dset.data)
+                self.labels = torch.tensor(dset.targets)
+                self.indices = torch.arange(len(self.images))
+                self.p_values = torch.zeros(len(self.images))
+            else:
+                self.images, self.labels, self.indices, self.p_values = zip(*dataset)
+                # Convert PIL images to np unit8
+                self.images = [np.array(img).astype(np.uint8) for img in self.images]
+                self.images = torch.tensor(np.array(self.images))
+                self.labels = torch.tensor(self.labels)
+                self.indices = torch.tensor(self.indices)
+                self.p_values = torch.tensor(self.p_values)
+
+        else:
+            dset = torchvision.datasets.CIFAR10(root=path, train=False, download=(not os.path.exists(os.path.join(path, 'cifar-10-batches-py'))))
+            self.images = torch.tensor(dset.data)
+            self.labels = torch.tensor(dset.targets)
+            self.indices = torch.arange(len(self.images))
+            self.p_values = torch.zeros(len(self.images))
+
+        # It's faster to load+process uint8 data than to load preprocessed fp16 data
+        self.images = (self.images / 255).permute(0, 3, 1, 2).to(memory_format=torch.channels_last)
+
+        self.normalize = transforms.Normalize(cifar_mean, cifar_std)
+        self.denormalize = transforms.Normalize(
+                                tuple(-mean / std for mean, std in zip(cifar_mean, cifar_std)), 
+                                tuple(1 / std for std in cifar_std)
+                            )
+        
+        self.aug = aug or {}
+        for k in self.aug.keys():
+            assert k in ['flip', 'translate', 'cutout'], 'Unrecognized key: %s' % k
+
+        self.batch_size = batch_size
+        self.drop_last = train if drop_last is None else drop_last
+        self.shuffle = train if shuffle is None else shuffle
+        self.device = device
+        self.train = train
+
+    def save(self, path):
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+        obj = {'images': self.images, 'labels': self.labels}
+        torch.save(obj, path)
+
+    def load(self, path):
+        obj = torch.load(path)
+        self.images = obj['images'].to(self.device)
+        self.labels = obj['labels'].to(self.device)
+        return self
+
+    def augment(self, images):
+        if self.aug.get('flip', False):
+            images = batch_flip_lr(images)
+        if self.aug.get('cutout', 0) > 0:
+            images = batch_cutout(images, self.aug['cutout'])
+        if self.aug.get('translate', 0) > 0:
+            # Apply translation in minibatches in order to save memory
+            images = torch.cat([batch_translate(image_batch, self.aug['translate'])
+                                for image_batch in images.split(5000)])
+        return images
+
+    def __len__(self):
+        return len(self.images)//self.batch_size if self.drop_last else int(np.ceil(len(self.images)/self.batch_size))
+
+    def __iter__(self):
+        images = self.augment(self.normalize(self.images))
+        indices = (torch.randperm if self.shuffle else torch.arange)(len(images), device=images.device)
+        for i in range(len(self)):
+            idxs = indices[i*self.batch_size:(i+1)*self.batch_size]
+            if self.train:
+                yield (images[idxs], self.labels[idxs], self.indices[idxs], self.p_values[idxs])
+            else:
+                yield (images[idxs], self.labels[idxs])
+
+def get_patches(x, patch_shape):
+    c, (h, w) = x.shape[1], patch_shape
+    return x.unfold(2,h,1).unfold(3,w,1).transpose(1,3).reshape(-1,c,h,w).float()
+
+def get_whitening_parameters(patches):
+    n,c,h,w = patches.shape
+    patches_flat = patches.view(n, -1)
+    est_patch_covariance = (patches_flat.T @ patches_flat) / n
+    eigenvalues, eigenvectors = torch.linalg.eigh(est_patch_covariance, UPLO='U')
+    return eigenvalues.flip(0).view(-1, 1, 1, 1), eigenvectors.T.reshape(c*h*w,c,h,w).flip(0)
+
+def init_whitening_conv(layer, train_set, eps=5e-4):
+    patches = get_patches(train_set, patch_shape=layer.weight.data.shape[2:])
+    eigenvalues, eigenvectors = get_whitening_parameters(patches)
+    eigenvectors_scaled = eigenvectors / torch.sqrt(eigenvalues + eps)
+    layer.weight.data[:] = torch.cat((eigenvectors_scaled, -eigenvectors_scaled))
 
 #############
 # Transform Utils

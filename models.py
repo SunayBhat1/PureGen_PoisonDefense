@@ -12,7 +12,7 @@ import math
 def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,penul_features=512):
     if model_name == 'ResNet18': 
         model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn, penul_features=penul_features)
-    elif model_name == 'ResNet18_Basic':
+    elif model_name == 'ResNet18_HLB':
         model = ResNet18_Basic()
     elif model_name == 'HLB':
         model = make_hlb_net()
@@ -843,26 +843,6 @@ def ResNet18_Basic(**kwargs):
 
 ### Hyperparameters ###
 hyp = {
-    'opt': {
-        'train_epochs': 14.9,
-        'batch_size': 1024,
-        'lr': 11.6,                 # learning rate per 1024 examples
-        'momentum': 0.87,
-        'weight_decay': 0.0157,#157     # weight decay per 1024 examples (decoupled from learning rate)
-        'bias_scaler': 64.5,        # scales up learning rate (but not weight decay) for BatchNorm biases
-        'label_smoothing': 0.2,
-        'ema': {
-            'start_epochs': 4,
-            'decay_base': 0.95,
-            'decay_pow': 3.,
-            'every_n_steps': 5,
-        },
-        'whiten_bias_epochs': 3,    # how many epochs to train the whitening layer bias before freezing
-    },
-    'aug': {
-        'flip': True,
-        'translate': 2,
-    },
     'net': {
         'whitening': {
             'kernel_size': 2,

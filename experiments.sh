@@ -20,7 +20,7 @@
 ### Calt5_rez
 
 ### Node1 Base: Testing HLB Integrations
-python3 run.py --remote_user 'sunaybhat' --model 'ResNet18_Basic' --defense 'None' --num_proc 1 --v;
+python3 run.py --remote_user 'sunaybhat' --config_override 'HLB' --defense 'None' --num_proc 1 --v;
 
 
 

@@ -115,7 +115,10 @@ def load_target_network(args,device):
         if args.verbose: print(f'Loaded the target network from {state_dict_path}')
 
     # Move target_net to device
-    target_net = target_net.to(device)
+    if args.model in ['HLB','ResNet18_HLB']:
+        target_net = target_net.to(device).to(memory_format=torch.channels_last)
+    else:
+        target_net = target_net.to(device)
 
     # Reinit Linear layer for transfer learning
     if args.poison_mode == 'transfer' and args.reinit_linear:
@@ -156,6 +159,23 @@ def get_optimizer(args,target_net):
         elif args.optim == 'sgd':
             optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
+    if args.model in ['HLB','ResNet18_HLB']:
+
+        optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
+                                weight_decay=args.weight_decay*args.batch_size)
+        # kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
+        # lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
+        # wd = args.weight_decay * args.batch_size / kilostep_scale
+        # lr_biases = lr * args.bias_scaler
+
+        # print(f'lr: {lr}, lr_biases: {lr_biases}, wd: {wd}')
+
+        # norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
+        # other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
+        # param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
+        #              dict(params=other_params, lr=lr, weight_decay=wd/lr)]
+        # optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)
+
     return optimizer
 
 
@@ -174,6 +194,23 @@ def get_test_acc(net, loader, device):
 
     acc = 100 * correct / total
     return acc
+
+def eval_HLB(model, loader,device):
+    model.eval()
+    with torch.no_grad():
+        outs = []
+        # Iterate over each batch from the loader
+        for inputs, _ in loader:
+            inputs = inputs.to(device)
+            # Apply the model to the inputs and their flipped versions, then sum the results
+            output = model(inputs) + model(inputs.flip(-1))
+            # Append the output to the list of outputs
+            outs.append(output)
+            xm.mark_step()
+
+        # Concatenate the list of outputs into a single tensor
+        outs = torch.cat(outs)
+    return (outs.argmax(1) == loader.labels.to(device)).float().mean().item()
 
 def run_test_epoch_narcissus(test_loader, model, loss_fn, poisoned_label, device):
     model.eval()
