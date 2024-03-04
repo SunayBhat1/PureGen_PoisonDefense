@@ -9,7 +9,7 @@ import glob
 
 from models import load_model
 from utils.utils_data import *
-
+from utils.utils_optim import *
 try: import torch_xla.core.xla_model as xm
 except: pass
 
@@ -146,7 +146,18 @@ def get_optimizer(args,target_net):
                     nd in n for nd in no_decay)], 'weight_decay': 0.0}
             ]
             optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
-
+        elif args.optim == 'smd':
+            no_decay = ['bias', 'bn']
+            grouped_parameters = [
+                {'params': [p for n, p in target_net.named_parameters() if not any(
+                    nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+                {'params': [p for n, p in target_net.named_parameters() if any(
+                    nd in n for nd in no_decay)], 'weight_decay': 0.0}
+            ]
+            optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True,q=1.25)
+        elif  args.optim == 'adamwq':
+            optimizer = AdamWq(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay,q=1.25)
+            
     elif args.poison_mode == 'transfer':
 
         if args.fine_tune:
@@ -159,22 +170,22 @@ def get_optimizer(args,target_net):
         elif args.optim == 'sgd':
             optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    if args.model in ['HLB','ResNet18_HLB']:
+    # if args.model in ['HLB','ResNet18_HLB']:
 
-        optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
-                                weight_decay=args.weight_decay*args.batch_size)
-        # kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
-        # lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
-        # wd = args.weight_decay * args.batch_size / kilostep_scale
-        # lr_biases = lr * args.bias_scaler
+    #     optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
+    #                             weight_decay=args.weight_decay*args.batch_size)
+    #     # kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
+    #     # lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
+    #     # wd = args.weight_decay * args.batch_size / kilostep_scale
+    #     # lr_biases = lr * args.bias_scaler
 
-        # print(f'lr: {lr}, lr_biases: {lr_biases}, wd: {wd}')
+    #     # print(f'lr: {lr}, lr_biases: {lr_biases}, wd: {wd}')
 
-        # norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
-        # other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
-        # param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
-        #              dict(params=other_params, lr=lr, weight_decay=wd/lr)]
-        # optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)
+    #     # norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
+    #     # other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
+    #     # param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
+    #     #              dict(params=other_params, lr=lr, weight_decay=wd/lr)]
+    #     # optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)
 
     return optimizer
 

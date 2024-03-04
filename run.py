@@ -26,6 +26,7 @@ from utils.utils import *
 from utils.utils_data import *
 from utils.utils_ebm import *
 from utils.utils_baselines import *
+from utils.utils_optim import *
 
 def main(rank, args):
 
@@ -182,6 +183,14 @@ def main(rank, args):
     # Loss function
     criterion = nn.CrossEntropyLoss()
 
+    # define RMD loss functions 
+    # z, per_sample_loss, per_sample_criterion, total_loss, lmbda, rmd_criterion = get_RMD_losses(device,poisoned_ebm_loader)
+    N = len(poisoned_ebm_loader)
+    z =  torch.normal(0.0, 0.0000005, size=(N,), device=device)#.type(torch.float64) #small z
+    per_sample_criterion = customCrossEntropy(device, reduction = 'none').to(device)#.type(torch.float64)
+    lmbda = 0.1
+    rmd_criterion = RMD_Loss(per_sample_criterion,device=device, num_datapoints=N) #losses are averaged in minibatch    
+
     if args.model == 'HLB':
         criterion = nn.CrossEntropyLoss(label_smoothing=0.2)
 
@@ -261,23 +270,76 @@ def main(rank, args):
             
             input, target = input.to(device), target.to(device)
             output = target_net(input)
-
+            xm.master_print(index)
             # Backward pass
-            if args.model in ['HLB','ResNet18_HLB']:
-                loss = F.cross_entropy(output, target, reduction='none')
-                logs['train_loss'][-1] += loss.mean().item()
-                # train_acc.append((outputs.detach().argmax(1) == labels).float().mean().item())
-                optimizer.zero_grad(set_to_none=True)
-                loss.sum().backward()
-                optimizer.step()
-                scheduler.step()
+            if True:
+                # lets do explicit regularization
+                
+                if args.model in ['HLB','ResNet18_HLB']:
+                    # # loss = F.cross_entropy(output, target, reduction='none')
+                    # sample_loss = per_sample_criterion(output, target)   # per-sample loss in each batch
+                    # logs['train_loss'][-1] += sample_loss.mean().item()
+                    
+                    
+                    # rmd_criterion.set_z_values(z, index)
+                    # rmd_loss = rmd_criterion(output, target)                    
+                    
+                    # optimizer.zero_grad(set_to_none=True)
+                    # rmd_loss.backward()
+                    # optimizer.step()
+                    # lr = scheduler.get_last_lr()[0]
+                    # # Compute c_i for batch 
+                    # c_batch = lr * (z[index] - torch.sqrt(2*sample_loss.clone().detach()))
+                    # c_batch = c_batch.clone().detach()           
+                    # # Update z-auxiliary variables
+                    # z[index] = z[index] - (lmbda * c_batch)                         
+                    # scheduler.step()
+                          
+                          
+                          
+                          
+                    output = target_net(input)
+                    sample_loss = per_sample_criterion(output, target)   # per-sample loss in each batch
+                    logs['train_loss'][-1] += sample_loss.mean().item()
+                    
+                    rmd_criterion.set_z_values(z, index)
+                    rmd_loss = rmd_criterion(output, target)    
+                    torch.nn.utils.clip_grad_norm_(target_net.parameters(), 1)    
+                    optimizer.zero_grad(set_to_none=True)
+
+                    rmd_loss.backward()
+                    optimizer.step()
+                    lr = scheduler.get_last_lr()[0]
+                    # Compute c_i for batch 
+                    c_batch = lr * (z[index] - torch.sqrt(2*sample_loss.clone().detach()))
+                    c_batch = c_batch.clone().detach()
+
+                    # Update z-auxiliary variables
+                    z[index] = z[index] - (lmbda * c_batch)                          
+                else:
+                    optimizer.zero_grad()
+                    loss = criterion(output, target)
+                    loss.backward()
+                    optimizer.step()
+                    # Update logs
+                    logs['train_loss'][-1] += loss.item()
+                
             else:
-                optimizer.zero_grad()
-                loss = criterion(output, target)
-                loss.backward()
-                optimizer.step()
-                # Update logs
-                logs['train_loss'][-1] += loss.item()
+                if args.model in ['HLB','ResNet18_HLB']:
+                    loss = F.cross_entropy(output, target, reduction='none')
+                    logs['train_loss'][-1] += loss.mean().item()
+                    # train_acc.append((outputs.detach().argmax(1) == labels).float().mean().item())
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.sum().backward()
+                    optimizer.step()
+                    scheduler.step()
+                else:
+                    optimizer.zero_grad()
+                    loss = criterion(output, target)
+                    loss.backward()
+                    optimizer.step()
+                    # Update logs
+                    logs['train_loss'][-1] += loss.item()
 
             if args.device_type == 'xla': xm.mark_step()
 
@@ -399,7 +461,7 @@ if __name__ == '__main__':
     parser.add_argument('--defense', default='EBM', type=str, choices=['None','EBM','Epic','Friendly','Diff','EBM_Diff'],help='type of defense to use')
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
-    parser.add_argument('--model', default='ResNet18', type=str, choices=['ResNet18','ResNet18_Basic','HLB','MobileNetV2','DenseNet121'],help='type of model to use')
+    parser.add_argument('--model', default='ResNet18', type=str, choices=['ResNet18','ResNet18_HLB','HLB','MobileNetV2','DenseNet121'],help='type of model to use')
 
     ### HLB Arguments ###
     parser.add_argument('--hlb_flip', default=True, action='store_false',help='whether to use flip in HLB')
