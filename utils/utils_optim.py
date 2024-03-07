@@ -222,7 +222,7 @@ class customCrossEntropy(nn.Module):
   def forward(self, predictions, target):
 
     reduced_exponents = predictions - predictions.gather(1, target.unsqueeze(1)).squeeze()[:, None]
-    loss_elements = torch.logsumexp(reduced_exponents.type(torch.float64), dim=1) + 1e-38
+    loss_elements = torch.logsumexp(reduced_exponents.type(torch.float64), dim=1) #+ 1e-38
     # loss_elements = torch.logsumexp(reduced_exponents, dim=1) #+ 1e-38
     # exp = torch.expm1(reduced_exponents.type(torch.float64))+ 1
     # loss_elements = torch.log1p(torch.sum(exp, dim = 1) - 1).type(torch.float64)

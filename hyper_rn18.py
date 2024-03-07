@@ -253,13 +253,13 @@ def evaluate(model, loader,device):
 
 def train(rank, test_loader=None, epochs=hyp['opt']['epochs'], lr=hyp['opt']['lr']):
     train_augs = dict(flip=hyp['aug']['flip'], translate=hyp['aug']['translate'], cutout=hyp['aug']['cutout'])
-    train_loader = CifarLoader('/home/sunaybhat/data', train=True, batch_size=hyp['opt']['batch_size'], aug=train_augs)
+    train_loader = CifarLoader('/home/omeadpooladzandi/data', train=True, batch_size=hyp['opt']['batch_size'], aug=train_augs)
 
     print(f'IMages Mean, std: {train_loader.images.mean()}, {train_loader.images.std()}')
     
     device = xm.xla_device()
     if test_loader is None:
-        test_loader = CifarLoader('/home/sunaybhat/data', train=False, batch_size=1000,device=device)
+        test_loader = CifarLoader('/home/omeadpooladzandi/data', train=False, batch_size=1000,device=device)
     batch_size = train_loader.batch_size
 
     momentum = hyp['opt']['momentum']

@@ -77,7 +77,7 @@ def get_train_data(dataset_type, data_dir, use_random_transform=False, poisoned=
             dataset = SubsetOfList(train_list, transform=transform, start_idx=0, end_idx=4800)
 
         elif dataset_type == 'cifar10_GM':
-            gm_used_indices = np.load('/Users/sunaybhat/Documents/GitHub/data/data_EBM_Defense/models/ebms/indices_gm_used.npy')
+            gm_used_indices = np.load('/Users/omeadpooladzandi/Documents/GitHub/data/data_EBM_Defense/models/ebms/indices_gm_used.npy')
             dataset = datasets.CIFAR10(data_dir, train=True, download=True, transform=transform)
             dataset.data = np.delete(dataset.data, gm_used_indices, axis=0)
             dataset.targets = np.delete(dataset.targets, gm_used_indices, axis=0)

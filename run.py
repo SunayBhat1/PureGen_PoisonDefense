@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 import torchvision
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 
 try: 
     import torch_xla.core.xla_model as xm
@@ -174,7 +175,7 @@ def main(rank, args):
         total_train_steps = np.ceil(len(train_data_poisoned_ebm) * args.epochs)
         lr_schedule = np.interp(np.arange(1+total_train_steps),
                             [0, int(0.2 * total_train_steps), total_train_steps],
-                            [0.2, 1, 0]) # triangular learning rate schedule
+                            [0.2, 1, 0])*0.85 # triangular learning rate schedule
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule.__getitem__)
         if args.verbose: print(f'Loaded the HLB scheduler with {total_train_steps} steps')
 
@@ -185,7 +186,7 @@ def main(rank, args):
 
     # define RMD loss functions 
     # z, per_sample_loss, per_sample_criterion, total_loss, lmbda, rmd_criterion = get_RMD_losses(device,poisoned_ebm_loader)
-    N = len(poisoned_ebm_loader)
+    N = 50_000
     z =  torch.normal(0.0, 0.0000005, size=(N,), device=device)#.type(torch.float64) #small z
     per_sample_criterion = customCrossEntropy(device, reduction = 'none').to(device)#.type(torch.float64)
     lmbda = 0.1
@@ -265,57 +266,63 @@ def main(rank, args):
         if args.poison_type == 'Narcissus': logs['t_acc'].append(0) 
 
         target_net.train()
-
+        # xm.master_print(z)
         for input, target, index, p in poisoned_ebm_loader:
             
             input, target = input.to(device), target.to(device)
+            input = Variable(input)
+            target = Variable(target)    
             output = target_net(input)
-            xm.master_print(index)
+            # xm.master_print(index)
             # Backward pass
             if True:
                 # lets do explicit regularization
                 
                 if args.model in ['HLB','ResNet18_HLB']:
-                    # # loss = F.cross_entropy(output, target, reduction='none')
-                    # sample_loss = per_sample_criterion(output, target)   # per-sample loss in each batch
-                    # logs['train_loss'][-1] += sample_loss.mean().item()
-                    
-                    
-                    # rmd_criterion.set_z_values(z, index)
-                    # rmd_loss = rmd_criterion(output, target)                    
-                    
                     # optimizer.zero_grad(set_to_none=True)
+                    # output = target_net(input)
+                    # sample_loss = per_sample_criterion(output, target)   # per-sample loss in each batch
+
+                    # rmd_criterion.set_z_values(z, index)
+                    # rmd_loss = rmd_criterion(output, target)        
+        
+                    # # gradient clipping 
+                    # torch.nn.utils.clip_grad_norm_(target_net.parameters(), 1)
                     # rmd_loss.backward()
                     # optimizer.step()
                     # lr = scheduler.get_last_lr()[0]
                     # # Compute c_i for batch 
                     # c_batch = lr * (z[index] - torch.sqrt(2*sample_loss.clone().detach()))
-                    # c_batch = c_batch.clone().detach()           
-                    # # Update z-auxiliary variables
-                    # z[index] = z[index] - (lmbda * c_batch)                         
-                    # scheduler.step()
-                          
-                          
-                          
-                          
-                    output = target_net(input)
-                    sample_loss = per_sample_criterion(output, target)   # per-sample loss in each batch
-                    logs['train_loss'][-1] += sample_loss.mean().item()
-                    
-                    rmd_criterion.set_z_values(z, index)
-                    rmd_loss = rmd_criterion(output, target)    
-                    torch.nn.utils.clip_grad_norm_(target_net.parameters(), 1)    
-                    optimizer.zero_grad(set_to_none=True)
+                    # c_batch = c_batch.clone().detach()
 
-                    rmd_loss.backward()
-                    optimizer.step()
+                    # # Update z-auxiliary variables
+                    # z[index] -=  (lmbda * c_batch)      
+                    
+                    optimizer.zero_grad(set_to_none=True)
+                    def closure():
+                        output = target_net(input)
+                        sample_loss = per_sample_criterion(output, target)   # per-sample loss in each batch
+                        
+                        rmd_criterion.set_z_values(z, index)
+                        rmd_loss = rmd_criterion(output, target)   
+                        torch.nn.utils.clip_grad_norm_(target_net.parameters(), 1)
+                        rmd_loss.backward()     
+                        return rmd_loss, output,sample_loss
+                    # gradient clipping 
+                    # torch.nn.utils.clip_grad_norm_(target_net.parameters(), 1)
+                    # rmd_loss, output,sample_loss = rmd_loss.backward(closure)
+                    rmd_loss, output,sample_loss = optimizer.step(closure)
                     lr = scheduler.get_last_lr()[0]
                     # Compute c_i for batch 
                     c_batch = lr * (z[index] - torch.sqrt(2*sample_loss.clone().detach()))
                     c_batch = c_batch.clone().detach()
 
                     # Update z-auxiliary variables
-                    z[index] = z[index] - (lmbda * c_batch)                          
+                    z[index] -=  (lmbda * c_batch)      
+                    scheduler.step()                      
+                    
+                    logs['train_loss'][-1] += sample_loss.mean().item()
+                                   
                 else:
                     optimizer.zero_grad()
                     loss = criterion(output, target)

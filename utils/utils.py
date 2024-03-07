@@ -154,9 +154,19 @@ def get_optimizer(args,target_net):
                 {'params': [p for n, p in target_net.named_parameters() if any(
                     nd in n for nd in no_decay)], 'weight_decay': 0.0}
             ]
-            optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True,q=1.25)
+            optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True,q=1.5)
         elif  args.optim == 'adamwq':
-            optimizer = AdamWq(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay,q=1.25)
+            # optimizer = AdamWq(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay,q=1.25)
+            lr_biases = 9e-3 * 128
+            norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
+            other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
+            param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=5e-4),
+                            dict(params=other_params, lr=9e-3, weight_decay=5e-4)]            
+            # optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
+            # optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, q=1.5, momentum=args.momentum, nesterov=True)
+            optimizer = AdamWq(param_configs, betas=(0.9,0.999),q=1.5,eps=5e-7)
+            # optimizer = XMatP(target_net.parameters(), lr_params=2e-2, preconditioner_init_scale=None,
+            #                   grad_clip_max_norm=100,momentum=0.9,regularization=1.5,preconditioner_update_probability=0.1)            
             
     elif args.poison_mode == 'transfer':
 
