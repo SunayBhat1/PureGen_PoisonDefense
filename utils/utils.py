@@ -8,7 +8,7 @@ import glob
 
 
 from clf_models import load_model
-from utils_data import *
+from utils.utils_data import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass
