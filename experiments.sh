@@ -29,8 +29,11 @@ python3 run.py --dataset 'stl10'
 # Purificatiion #
 ####################
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 0,150,150,150,300,300,300,300 --diff_purify_steps 0,5,25,50,5,25,50,100  --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 0,150,150,150,300,300,300,300 --diff_purify_steps 0,5,25,50,5,25,50,100  --num_proc 8 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None;
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None --poison_type 'Narcissus';
 
 # Base Dataset
 python3 purify.py --remote_user 'sunaybhat';
