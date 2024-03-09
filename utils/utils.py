@@ -7,8 +7,8 @@ import json
 import glob
 
 
-from models import load_model
-from utils.utils_data import *
+from clf_models import load_model
+from utils_data import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass
@@ -161,20 +161,20 @@ def get_optimizer(args,target_net):
 
     if args.model in ['HLB','ResNet18_HLB']:
 
-        optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
-                                weight_decay=args.weight_decay*args.batch_size)
-        # kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
-        # lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
-        # wd = args.weight_decay * args.batch_size / kilostep_scale
-        # lr_biases = lr * args.bias_scaler
+        # optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
+        #                         weight_decay=args.weight_decay*args.batch_size)
+        kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
+        lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
+        wd = args.weight_decay * args.batch_size / kilostep_scale
+        lr_biases = lr * args.bias_scaler
 
-        # print(f'lr: {lr}, lr_biases: {lr_biases}, wd: {wd}')
+        print(f'lr: {lr}, lr_biases: {lr_biases}, wd: {wd}')
 
-        # norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
-        # other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
-        # param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
-        #              dict(params=other_params, lr=lr, weight_decay=wd/lr)]
-        # optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)
+        norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
+        other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
+        param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
+                     dict(params=other_params, lr=lr, weight_decay=wd/lr)]
+        optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)
 
     return optimizer
 
