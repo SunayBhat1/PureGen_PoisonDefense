@@ -7,27 +7,6 @@ import os
 try: import torch_xla.core.xla_model as xm
 except: pass
 
-from EBM_Training.EBMs import EBMSNGAN32
-
-def get_ebm(args,device):
-    if args.ebm is not None:
-        ebm = load_ebm(os.path.join(args.data_dir,'models','ebms',f'{args.ebm}'), args.ebm_nf).to(device)
-    else:
-        if args.poison_type in ['BullseyePolytope','BullseyePolytope_Bench']:
-            ebm = load_ebm(os.path.join(args.data_dir,'models','ebms',f'ebm_cifar10_BP48k.pt'), 128).to(device)
-        elif args.poison_type == 'Gradient_Matching':
-            ebm = load_ebm(os.path.join(args.data_dir,'models','ebms',f'ebm_cifar10_GM37K_filt64.pt'), 64).to(device)
-        elif args.poison_type == 'Narcissus':
-            ebm = load_ebm(os.path.join(args.data_dir,'models','ebms',f'ebm_cifar10_45k.pt'), 128).to(device)
-            
-    return ebm.eval()
-
-def load_ebm(ebm_path,nf=128): 
-    ebm = EBMSNGAN32(nf=nf)
-    state_dict = torch.load(ebm_path, map_location=torch.device('cpu'))
-    ebm.load_state_dict(state_dict)
-    return ebm
-
 def ebm_update(ebm_model, X, langevin_steps , mcmc_temp, requires_grad=False, device_type='xla'):
     langevin_init_noise = 0.0
     langevin_eps = 1.25e-2

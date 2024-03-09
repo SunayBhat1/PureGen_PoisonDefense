@@ -15,16 +15,13 @@ import random
 try: import torch_xla.core.xla_model as xm
 except: pass
 
-from EBM_Training.EBMs import EBMSNGAN32
-from utils.utils_ebm import purify
-
 
 cifar_mean = (0.4914, 0.4822, 0.4465)
 cifar_std = (0.2023, 0.1994, 0.2010)
 
 cifar_mean_gm = (0.4914, 0.4822, 0.4465)
 cifar_std_gm = (0.2471, 0.2435, 0.2616)
-
+        
 
 #############
 # Data Loaders 
@@ -74,11 +71,13 @@ def get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model,
                                             n_steps=args.pre_purify_steps if args.defense == 'EBM' and args.purify_freq > 0 else None)
 
     if args.model in ['HLB','ResNet18_HLB']:
-        aug = {'flip': args.hlb_flip, 'translate': args.hlb_translate, 'cutout': args.hlb_cutout}
+        aug = {'flip': args.hlb_flip}
+        if args.hlb_translate is not None: aug['translate'] = args.hlb_translate
+        if args.hlb_cutout is not None: aug['cutout'] = args.hlb_cutout
         train_data_poisoned = CifarLoader(train_data_poisoned.data, train=True, batch_size=args.batch_size, aug=aug, device=device,no_poison=args.no_poison,path=args.data_dir)
-        
 
     return train_data_poisoned
+
 
 class PoisonedDataset_EBM(data.Dataset):
 
@@ -633,10 +632,10 @@ def get_poisons(args,target_index):
                 else:
                     index_list = None
                 poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
-                                                                                            args.data_dir, args.dataset, target_index, args.num_images_narcissus, args.last_n_narcissus, index_list)
+                                                                                            args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
             elif args.poison_mode == 'transfer':
                 poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
-                                                                                            os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, args.last_n_narcissus, index_list=None, transfer_subset=True, subset_forward_transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize(cifar_mean, cifar_std)]))
+                                                                                            os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list=None, transfer_subset=True, subset_forward_transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize(cifar_mean, cifar_std)]))
         elif args.poison_type == 'BullseyePolytope':
 
             inverse_transform = transforms.Compose([transforms.Normalize(mean=[-i/j for i,j in zip(cifar_mean, cifar_std)], std=[1/j for j in cifar_std]),transforms.ToPILImage()])

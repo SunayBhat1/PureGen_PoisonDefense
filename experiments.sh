@@ -13,11 +13,6 @@
 ### Node7
 ### Node8
 ### Node9
-### Calt1
-### Calt2
-### Calt3_dani
-### Calt4_david
-### Calt5_rez
 
 ### Node1 Base: Testing HLB Integrations
 python3 run.py --remote_user 'sunaybhat' --config_override 'HLB' --defense 'None' --num_proc 1 --v;
@@ -31,64 +26,22 @@ python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_f
 python3 run.py --dataset 'stl10'
 
 ####################
-# Core Experiments #
+# Purificatiion #
 ####################
 
-### Defenses
---defense 'Epic' --epic_subset_size 0.1 --epic_drop_after 10
---defense 'Epic' --epic_subset_size 0.2 --epic_drop_after 20
---defense 'Epic' --epic_subset_size 0.3 --epic_drop_after 30
---defense 'Friendly' 
---defense 'Friendly' --friendly_noise_type 'friendly' 'gaussian'
---defense 'EBM'
+# Base Dataset
+python3 purify.py --remote_user 'sunaybhat';
 
-### From Scratch
-# Gradient Matching
-python3 run.py --remote_user 'sunaybhat' --poison_type 'Gradient_Matching' --defense 'None';
-# Narcissus
-python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None';
+# Poisons
+--poison_type 'Narcissus' # 'Gradient_Matching'
 
-### Tranfer Learning
-# Bullseye Polytope Linear-Transfera
-python3 run.py --remote_user 'sunaybhat' --poison_type 'BullseyePolytope' --defense 'None' --poison_mode 'transfer';
-# Bullseye Polytope Fine-Tune
-python3 run.py --remote_user 'sunaybhat' --poison_type 'BullseyePolytope' --defense 'None' --poison_mode 'transfer' --fine_tune;
-# Narcissus  Fine-Tune
-python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None' --poison_mode 'transfer' --fine_tune --config_override 'NARC_FINE_TUNE_50_50'; # ['NARC_FINE_TUNE_50_200'],['NARC_FINE_TUNE_20_200']
-# Bullseye Polytope Benchmark Linear-Transfer
-python3 run.py --remote_user 'sunaybhat' --poison_type 'BullseyePolytope_Bench' --defense 'None' --poison_mode 'transfer' --config_override 'TRANSFER_BENCH';
+# For multiple nodes use 
+--num_proc 8 # And pass in a list to any of these (or multiple): --ebm_lang_steps, --ebm_lang_temp, --diff_train_steps, --diff_purify_steps, --diff_eta, --ebm_name, --diff_name, --ebm_nf, --diff_nf
+
 
 ###############
 # Experiments #
 ###############
-
-python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
-
-### Node 1
-for i in 0 8
-do
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'Diff' --start_target_index $i;
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM' --start_target_index $i;
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM_Diff' --start_target_index $i;
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None' --start_target_index $i;
-done
-
-for j in 175 200 250 500
-    do
-    for i in 0 8
-    do
-        python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'Diff' --start_target_index $i --diff_steps $j;
-        python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM_Diff' --start_target_index $i --diff_steps $j;
-    done
-done
-
-for i in 0 8
-do
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'Diff' --start_target_index $i;
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM' --start_target_index $i;
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'EBM_Diff' --start_target_index $i;
-    python3 run.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --defense 'None' --start_target_index $i;
-done
 
 ############################
 # Setup Node and Copy Data #
@@ -103,13 +56,11 @@ rsync -av "sunaybhat@node6:/home/sunaybhat/models/ebms/*" /Users/sunaybhat/Docum
 # Copy Cifar10 Split Data
 scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth sunaybhat@Calt3_dani:/home/sunaybhat/data/;
 
-# Delete Results
-ssh sunaybhat@node1_Base 'rm -rf /home/sunaybhat/results_EBM_Defense';
 
 (
 # Clone 
 mkdir data;
-git clone https://github.com/SunayBhat1/EBM_Diff_Poison_Defense
+git clone https://github.com/SunayBhat1/PureDefense
 # Create a data dir
 pip install tqdm;
 pip install pandas;

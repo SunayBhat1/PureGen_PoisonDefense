@@ -3,14 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # Define the create_net function
-def create_ebm(net_type, image_dims, num_filters, patch_size=1):
+def create_ebm(net_type, num_filters, num_channels = 3, patch_size=1):
     """
     Create an EBM based on the given net_type and parameters.
 
     Args:
         net_type (str): The type of network to create.
-        image_dims (tuple): The dimensions of the input image.
         num_filters (int): The number of filters to use in the network.
+        num_channels (int, optional): The number of channels in the input image. Defaults to 3.
         patch_size (int, optional): The size of the patch. Defaults to 1.
 
     Returns:
@@ -18,7 +18,7 @@ def create_ebm(net_type, image_dims, num_filters, patch_size=1):
     """
 
     if net_type == 'EBM_Small':
-        net = EBM(n_c=image_dims[0])
+        net = EBM(n_c=num_channels)
     elif net_type == 'EBMSNGAN32':
         net = EBMSNGAN32(nf=num_filters, patch_size=patch_size) 
     elif net_type == 'EBMSNGAN128':

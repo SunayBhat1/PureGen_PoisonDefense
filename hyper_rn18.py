@@ -302,3 +302,4 @@ def train(rank, test_loader=None, epochs=hyp['opt']['epochs'], lr=hyp['opt']['lr
 if __name__ == '__main__':
     os.environ['XRT_TPU_CONFIG'] = 'localservice;0;localhost:51011'
     xmp.spawn(train, nprocs=8, start_method='fork')
+

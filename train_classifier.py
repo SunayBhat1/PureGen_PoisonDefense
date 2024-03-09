@@ -473,7 +473,7 @@ if __name__ == '__main__':
     ### HLB Arguments ###
     parser.add_argument('--hlb_flip', default=True, action='store_false',help='whether to use flip in HLB')
     parser.add_argument('--hlb_translate', default=4, type=int,help='whether to use translate in HLB')
-    parser.add_argument('--hlb_cutout', default=12, type=int,help='whether to use cutout in HLB')
+    parser.add_argument('--hlb_cutout', default=None, type=int,help='whether to use cutout in HLB')
 
     ### EBM Arguments ###
     args_ebm = parser.add_argument_group('EBM')
