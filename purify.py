@@ -10,7 +10,7 @@ except: pass
 
 from utils.utils import *
 
-from utils_purify import get_poisons, ImageListDataset, save_poisons, process_args
+from utils.utils_purify import get_poisons, ImageListDataset, save_poisons, process_args
 
 
 ### Main Function ###
@@ -28,14 +28,9 @@ def main(rank, args):
     
     # Get the data loader and number of target indices
     if args.poison_type is None:
-        train_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=True, download=True, transform=torchvision.transforms.ToTensor())
-        train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         target_indices = 1
         purify_pbar = True
     else:
-        poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,0)
-        train_loader = torch.utils.data.DataLoader(ImageListDataset(poison_tuple_list), batch_size=128, shuffle=False, num_workers=4)
-
         if args.poison_type == 'Narcissus':
             target_indices = 10
         elif args.poison_type == 'Gradient_Matching':
@@ -69,7 +64,7 @@ def main(rank, args):
 
         ### Get Data to Purify ###
         if args.poison_type is None:
-            train_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=True, download=True, transform=torchvision.transforms.ToTensor())
+            train_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=True, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=torchvision.transforms.ToTensor())
             train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,0)
