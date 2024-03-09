@@ -46,8 +46,10 @@ def main(rank, args):
         purify_pbar = False
 
     # Get diff and ebm model paths
-    ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.dataset,args.ebm_name+'.pt')
-    diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.dataset,args.diff_name+'.pt')
+    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.dataset,args.ebm_name+'.pt')
+    else: ebm_path = None
+    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.dataset,args.diff_name+'.pt')
+    else: diff_path = None
 
     # Create the PureDefense object
     PurifyClass = PureDefense(device,args.device_type,
@@ -78,15 +80,15 @@ def main(rank, args):
 
         ### Save the purified data ###
         data_key = ''
-        if args.ebm_lang_steps > 0:
+        if args.ebm_lang_steps > 0 and args.ebm_model is not None:
             data_key += f'{args.ebm_model}[{args.ebm_name}_nf{args.ebm_nf}]_{args.ebm_lang_steps}Steps_T{args.ebm_lang_temp}'
-        if args.diff_purify_steps > 0:
+        if args.diff_purify_steps > 0 and args.diff_model is not None:
             data_key += f'_{args.diff_model}[{args.diff_name}_nf{args.diff_nf}]_beta[{args.diff_train_steps}_{args.diff_schedule}]_{args.diff_purify_steps}Steps_{args.diff_eta}eta'
         if args.ebm_lang_steps > 0 and args.diff_purify_steps > 0:
             data_key += f'_reps{args.purify_reps}'
         
         if data_key == '':
-            data_key = 'baseline'
+            data_key = 'Baseline'
 
         if args.poison_type is None:
             if not os.path.exists(os.path.join(args.data_dir,'PureDefense',args.dataset)):
@@ -100,9 +102,10 @@ def main(rank, args):
             pbar.update(1)
             pbar.set_description(f'Poisoned Data Saved: {data_key}')
 
-    # Renendezvous
     if purify_pbar is False and rank == 0:
         pbar.close()
+
+    # Renendezvous
     xm.rendezvous('training end!')
 
 
@@ -134,6 +137,11 @@ def str_or_str_list(s):
     else:
         return s
 
+def none_or_str(value):
+    if value == 'None':
+        return None
+    return value
+
 ### Initializer ###
 if __name__ == '__main__':
     
@@ -160,7 +168,7 @@ if __name__ == '__main__':
 
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
-    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=str, choices=['EBM_Small','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
+    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'EBM_Small','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
     args_ebm.add_argument('--ebm_name', default='ebm_cifar10_45k', type=str_or_str_list, help='path to the EBM model including train dataset')
     args_ebm.add_argument('--ebm_nf', default=128, type=int_or_int_list,  help='number of filters for the ebm model')
     args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')
@@ -168,7 +176,7 @@ if __name__ == '__main__':
 
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
-    args_diff.add_argument('--diff_model', default='DDPM_UNET_EBM', type=str, choices=['DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
+    args_diff.add_argument('--diff_model', default='DDPM_UNET_EBM', type=none_or_str, choices=[None, 'DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
     args_diff.add_argument('--diff_name', default='mcmc_steps1600_bank_fixer_cosine', type=str_or_str_list, help='path to the diffusion model')
     args_diff.add_argument('--diff_nf', default=128, type=int_or_int_list,  help='number of filters for the unet model')
     args_diff.add_argument('--diff_train_steps', default=1000, type=int_or_int_list, help='training t-steps for diffuion model')
