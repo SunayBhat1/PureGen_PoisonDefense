@@ -8,7 +8,8 @@ import glob
 
 
 from clf_models import load_model
-from utils.utils_data import *
+from utils.utils_clf import *
+from utils.utils_optim import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass
@@ -88,7 +89,7 @@ def set_target_index_and_check_end(args, rank):
 def load_target_network(args,device):
 
     if args.poison_mode == 'from_scratch' or args.fine_tune:
-        target_net = load_model(args.model)
+        target_net = load_model(args.model,hlb_type=args.hlb_type)
     elif args.poison_type == 'BullseyePolytope':
         target_net = load_model(args.model, eval_bn=True)
     elif args.poison_type == 'BullseyePolytope_Bench':
@@ -115,7 +116,7 @@ def load_target_network(args,device):
         if args.verbose: print(f'Loaded the target network from {state_dict_path}')
 
     # Move target_net to device
-    if args.model in ['HLB','ResNet18_HLB']:
+    if 'HLB' in args.model:
         target_net = target_net.to(device).to(memory_format=torch.channels_last)
     else:
         target_net = target_net.to(device)
@@ -134,9 +135,29 @@ def load_target_network(args,device):
 
 def get_optimizer(args,target_net):
 
-    if args. poison_mode == 'from_scratch':
-        if args.optim == 'adam':
+    if args.poison_mode == 'from_scratch':
+
+        if args.model == 'ResNet18_HLB':
+            optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
+                                weight_decay=args.weight_decay*args.batch_size)
+            
+            return optimizer
+        
+        elif args.model == 'HLB':
+            kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
+            lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
+            wd = args.weight_decay * args.batch_size / kilostep_scale
+            lr_biases = lr * args.bias_scaler
+
+            norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
+            other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
+            param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
+                            dict(params=other_params, lr=lr, weight_decay=wd/lr)]
+            optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)    
+            
+        elif args.optim == 'adam':
             optimizer = torch.optim.Adam(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+
         elif args.optim == 'sgd':
             no_decay = ['bias', 'bn']
             grouped_parameters = [
@@ -146,6 +167,7 @@ def get_optimizer(args,target_net):
                     nd in n for nd in no_decay)], 'weight_decay': 0.0}
             ]
             optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
+
         elif args.optim == 'smd':
             no_decay = ['bias', 'bn']
             grouped_parameters = [
@@ -180,25 +202,42 @@ def get_optimizer(args,target_net):
         elif args.optim == 'sgd':
             optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    # if args.model in ['HLB','ResNet18_HLB']:
-
-        optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
-                                weight_decay=args.weight_decay*args.batch_size)
-        # kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
-        # lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
-        # wd = args.weight_decay * args.batch_size / kilostep_scale
-        # lr_biases = lr * args.bias_scaler
-
-        # print(f'lr: {lr}, lr_biases: {lr_biases}, wd: {wd}')
-
-        # norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
-        # other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
-        # param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
-        #              dict(params=other_params, lr=lr, weight_decay=wd/lr)]
-        # optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)
-
     return optimizer
 
+####################
+# Eval Functions   #
+####################
+
+def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=None, poison_target_image=None, target_mask_label=None,cifar_test_loader=None, target_index=None):
+
+    # Test the model for from_scratch attacks
+    if args.poison_mode == 'from_scratch':
+        if 'HLB' in args.model:
+            test_acc = eval_HLB(target_net, test_loader, device)
+        else:
+            test_acc = get_test_acc(target_net, test_loader, device)
+        logs['test_acc'].append(test_acc)
+        
+        if args.dataset == 'cinic10':
+            if 'HLB' in args.model:
+                cifar_acc = eval_HLB(target_net, cifar_test_loader, device)
+            else:
+                cifar_acc = get_test_acc(target_net, cifar_test_loader, device)
+            logs['cifar_acc'].append(cifar_acc)
+
+        if not args.no_poison:
+            if args.poison_type == 'Narcissus':
+                _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
+                logs['p_acc'].append(p_acc)
+                logs['t_acc'].append(t_acc)
+            
+    elif not args.no_poison and args.poison_type != 'Narcissus':
+        target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
+        pred = torch.argmax(target_pred).item()
+        success = bool(pred == target_mask_label)
+        logs['p_acc'][-1] = success
+
+    return logs
 
 def get_test_acc(net, loader, device):
     net.eval()
@@ -213,7 +252,7 @@ def get_test_acc(net, loader, device):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-    acc = 100 * correct / total
+    acc = correct / total
     return acc
 
 def eval_HLB(model, loader,device):
@@ -260,15 +299,42 @@ def run_test_epoch_narcissus(test_loader, model, loss_fn, poisoned_label, device
     
     return losses, p_acc, t_acc
 
+##################
+# Pbar Functions #
+##################
 
-def get_accs_save_results(args, rank, target_index, end_acc, success, correct_class, training_time, logs):
+def update_progress_bar(args, pbar, epoch, logs):
+    """
+    This function updates the progress bar with the test accuracy and poison success rate.
+
+    Parameters:
+        args: The command-line arguments.
+        pbar: The progress bar.
+        epoch (int): The current epoch.
+        logs (dict): The logs dictionary containing 'test_acc' and 'p_acc'.
+    """
+
+    # Update progress bar
+    pbar.update(1)
+    if args.no_poison:
+        pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%}')
+    elif args.poison_type != 'Narcissus':
+        pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%} | Poison Success {logs["p_acc"][-1]} | ')
+    elif args.poison_type == 'Narcissus':
+        pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%} | P Acc {logs["p_acc"][-1]:.2%} | ')
+
+##################
+# Save Functions #
+##################
+        
+def get_accs_save_results_clean(args, rank, target_index, end_acc, training_time, logs):
 
     if args.device_type == 'xla':
         df_path = os.path.join(args.output_dir,f'Results_{rank}.csv')
     else:
         df_path = os.path.join(args.output_dir,'Results.csv')
 
-    df = pd.DataFrame(columns=['Defense','Target Index','End Acc','Success','Correct Pred','Exp Name','Calc Time','Args','Logs','Train Time'])
+    df = pd.DataFrame(columns=['Model','Target Index','End Acc','Exp Name','Calc Time','Args','Logs','Train Time'])
 
     # Convert args to a dictionary and then a json string
     args_dict = vars(args)
@@ -281,13 +347,43 @@ def get_accs_save_results(args, rank, target_index, end_acc, success, correct_cl
     logs_str = json.dumps(logs)
 
     # Append results to the dataframe
-    df = pd.concat([df, pd.DataFrame({'Defense': args.defense, 'Target Index': target_index, 
+    df = pd.concat([df, pd.DataFrame({'Model': args.model, 'Target Index': target_index,
                                             'End Acc': end_acc,
-                                            'Success': success, 'Correct Pred': correct_class,
                                             'Exp Name': args.exp_name,
                                             'Calc Time': args.experiment_timestamp,
                                             'Args': args_str, 'Logs': logs_str, 'Train Time': training_time
                                             }, index=[0])], ignore_index=True)
+    # Save the dataframe
+    df.to_csv(df_path, index=False)
+
+def get_accs_save_results(args, rank, target_index, end_acc, success, correct_class, training_time, logs):
+
+    if args.device_type == 'xla':
+        df_path = os.path.join(args.output_dir,f'Results_{rank}.csv')
+    else:
+        df_path = os.path.join(args.output_dir,'Results.csv')
+
+    df = pd.DataFrame(columns=['Data Key','Model','Target Index','End Acc','Success','Correct Pred','Exp Name','Calc Time','Args','Logs','Train Time'])
+
+    # Convert args to a dictionary and then a json string
+    args_dict = vars(args)
+    for key, value in args_dict.items():
+        if isinstance(value, torch.device):
+            args_dict[key] = str(value)
+    args_str = json.dumps(args_dict)
+
+    # Convert the logs to a json string
+    logs_str = json.dumps(logs)
+
+    # Append results to the dataframe
+    df = pd.concat([df, pd.DataFrame({'Data Key': args.data_key, 'Model': args.model,
+                                        'Target Index': target_index, 
+                                        'End Acc': end_acc,
+                                        'Success': success, 'Correct Pred': correct_class,
+                                        'Exp Name': args.exp_name,
+                                        'Calc Time': args.experiment_timestamp,
+                                        'Args': args_str, 'Logs': logs_str, 'Train Time': training_time
+                                    }, index=[0])], ignore_index=True)
     
     # Save the dataframe
     df.to_csv(df_path, index=False)
@@ -299,7 +395,7 @@ def get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_
     else:
         df_path = os.path.join(args.output_dir,'Results.csv')
 
-    df = pd.DataFrame(columns=['Defense','Target Index','End Acc',
+    df = pd.DataFrame(columns=['Data Key','Model','Target Index','End Acc',
                                 'P1 Acc','T1 Acc','Exp Name',
                                 'Calc Time','Train Time',
                                 'P2 Acc','T2 Acc', 'P3 Acc','T3 Acc',
@@ -316,16 +412,17 @@ def get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_
     # Convert the logs to a json string
     logs_str = json.dumps(logs)
 
-    df = pd.concat([df, pd.DataFrame({'Defense': args.defense, 'Target Index': target_index, 
-                                            'End Acc': end_acc,
-                                            'P1 Acc': p_accs[1], 'T1 Acc': t_accs[1],
-                                            'Exp Name': args.exp_name,
-                                            'Calc Time': args.experiment_timestamp,
-                                            'Train Time': training_time,
-                                            'P2 Acc': p_accs[2], 'T2 Acc': t_accs[2],
-                                            'P3 Acc': p_accs[3], 'T3 Acc': t_accs[3],
-                                            'Args': args_str, 'Logs': logs_str, 
-                                            }, index=[0])], ignore_index=True)
+    df = pd.concat([df, pd.DataFrame({'Data Key': args.data_key, 'Model': args.model,
+                                        'Target Index': target_index, 
+                                        'End Acc': end_acc,
+                                        'P1 Acc': p_accs[1], 'T1 Acc': t_accs[1],
+                                        'Exp Name': args.exp_name,
+                                        'Calc Time': args.experiment_timestamp,
+                                        'Train Time': training_time,
+                                        'P2 Acc': p_accs[2], 'T2 Acc': t_accs[2],
+                                        'P3 Acc': p_accs[3], 'T3 Acc': t_accs[3],
+                                        'Args': args_str, 'Logs': logs_str, 
+                                    }, index=[0])], ignore_index=True)
     
     # Save the dataframe
     df.to_csv(df_path, index=False)

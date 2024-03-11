@@ -18,16 +18,15 @@ try:
     import torch_xla.distributed.xla_multiprocessing as xmp
 except: pass
 
-from diffusers import UNet2DModel
-from diffusers import DDPMScheduler
-
-from models import load_model
 from utils.utils import *
-from utils.utils_data import *
-from utils.utils_ebm import *
+from utils.utils_clf import *
 from utils.utils_baselines import *
 
 def main(rank, args):
+
+    ##############################
+    # Setup
+    ##############################
 
     # Set the device and seed (if not None)
     device = get_device(args.device_type)
@@ -41,116 +40,67 @@ def main(rank, args):
     
     if args.verbose: print(f'Running on {xm.get_ordinal()} with rank {rank} and target index {target_index} and rand {torch.rand(1)}')
 
-    ##############################
-    # Setup EBM
-    ##############################
+    ######################
+    # Load Training Data #
+    ######################
 
-    if args.defense in ['EBM','EBM_Diff']:
-        ebm_model = get_ebm(args, device)
-    else:
-        ebm_model = None
-
-    ##############################
-    # Setup Diffusion Model
-    ##############################
-        
-    if args.defense in ['Diff','EBM_Diff']:
-
-        diff_model_id = "google/ddpm-cifar10-32"
-        diff_model = UNet2DModel.from_pretrained(diff_model_id).to(device)
-
-        diff_scheduler = DDPMScheduler.from_pretrained(diff_model_id)
-        diff_scheduler.config['num_train_timesteps'] = args.diff_steps  # Reduced number of diffusion steps
-        diff_scheduler.config['beta_start'] = args.diff_beta_start # 0.00001  Starting noise level
-        diff_scheduler.config['beta_end'] = args.diff_beta_end # 0.00002  You may need to adjust this based on performance
-        diff_scheduler.config['beta_schedule'] = args.diff_beta_scheduler # Consider experimenting with 'cosine' or custom schedules
-        diff_scheduler.save_config("diff_scheduler")
-        diff_scheduler = DDPMScheduler.from_pretrained("diff_scheduler")
-    
-    else:
-        diff_model = None
-        diff_scheduler = None
-
-    ##############################
-    # Load training data (and poisons/target)
-    ##############################
+    test_trigger_loaders,poison_target_image, target_mask_label = None,None,None
 
     train_transforms = get_train_transforms(args)
 
+    train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device)
+
+    if 'HLB' in args.model:
+        train_loader = train_data
+    else:
+        train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,num_workers=4)
+
+    # Print training data details
+    if args.verbose:
+        p_count = sum(p.sum().item() for _, _, _, p in train_loader) 
+        if 'HLB' in args.model: print(f'Loaded training data {len(train_loader.images)} samples, {p_count} poisoned or {p_count/len(train_loader.images):.2%} poisoned')
+        else: print(f'Loaded training data {len(train_loader.dataset)} samples, {p_count} poisoned or {p_count/len(train_loader.dataset):.2%} poisoned')
+
+    if args.baseline_defense == 'Friendly':
+        
+        if args.poison_mode == 'from_scratch':
+            train_transforms_no_augs = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
+            train_data_no_augs = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
+        else:
+            train_transforms_no_augs = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
+            train_data_no_augs = get_base_poisoned_dataset(args,target_index,train_transforms,device)
+
+        train_loader_noaugs = torch.utils.data.DataLoader(train_data_no_augs, batch_size=args.batch_size, shuffle=True,num_workers=4)
+
+    ##########################
+    # Load Test/Target Data  #
+    ##########################
+        
     if args.poison_mode == 'from_scratch':
         test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
     else:
         test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
 
-    poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,target_index)
-    if poison_tuple_list is None:
-        print(f'Error loading poisons for {args.poison_type} for {target_index}, Error: {target_mask_label}')
-        xm.rendezvous('training end!')
-        return
+    test_data = get_test_dataset(args, test_transforms)
 
-    train_data_poisoned_ebm = get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model, 
-                                                        diff_model,diff_scheduler,
-                                                        device,
-                                                    train_transform=train_transforms)
-    
-    if args.model in ['HLB','ResNet18_HLB']:
-        poisoned_ebm_loader = train_data_poisoned_ebm
-        if args.verbose: print(f'IMages Mean, std: {poisoned_ebm_loader.images.mean()}, {poisoned_ebm_loader.images.std()}')
+    if 'HLB' in args.model:
+        test_loader = CifarLoader(test_data, train=False, batch_size=1000)
     else:
-        poisoned_ebm_loader = torch.utils.data.DataLoader(train_data_poisoned_ebm, batch_size=args.batch_size, shuffle=True,num_workers=4)
-
-    if args.defense == 'Friendly':
-        if args.poison_mode == 'from_scratch':
-            train_data_poisoned_ebm_noaugs = get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model, device,
-                                                                train_transform=transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm))
-        else:
-            train_data_poisoned_ebm_noaugs = get_base_poisoned_dataset(args,poison_tuple_list, poison_indices, ebm_model, device,
-                                                                    train_transform=transforms.Normalize(mean=cifar_mean, std=cifar_std))
-        poisoned_ebm_loader_noaugs = torch.utils.data.DataLoader(train_data_poisoned_ebm_noaugs, batch_size=args.batch_size, shuffle=True,num_workers=4)
-
-    p_count = sum(p.sum().item() for _, _, _, p in poisoned_ebm_loader) 
-    if args.model in ['HLB','ResNet18_HLB']:
-        if args.verbose: 
-            print(f'Loaded training data with {args.poison_type} poison, {p_count} samples , {p_count/len(poisoned_ebm_loader.images):.2%} poisoned, {len(poisoned_ebm_loader.images)} length')
-    else:
-        if args.verbose: 
-            print(f'Loaded training data with {args.poison_type} poison, {p_count} samples , {p_count/len(poisoned_ebm_loader.dataset):.2%} poisoned, {len(poisoned_ebm_loader.dataset)} length')
-
-    
-    ##############################
-    # Load Test data (and poison target)
-    ##############################
-            
-
-    if args.model in ['HLB','ResNet18_HLB']:
-        test_loader = CifarLoader(None, train=False, batch_size=1000,path=args.data_dir)
-
-    else:
-
-        if args.dataset == 'cifar10':
-            # The test set of clean CIFAR10
-            if args.device_type == 'xla': 
-                if os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py')):
-                    test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=False, transform=test_transforms)
-                else: 
-                    if xm.is_master_ordinal(): 
-                        test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=True, transform=test_transforms)
-                        xm.rendezvous('download end!')
-                    else: 
-                        xm.rendezvous('download end!')
-                        test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=False, transform=test_transforms)
-            else:     
-                test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=test_transforms)
-        elif args.dataset == 'cinic10': 
-            test_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'CINIC-10/test'), transform=test_transforms) 
-            cifar_test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=test_transforms)
-            cifar_test_loader = torch.utils.data.DataLoader(cifar_test_data, batch_size=128,num_workers=4)
         test_loader = torch.utils.data.DataLoader(test_data, batch_size=128,num_workers=4)
+
+    if args.dataset == 'cinic10':
+        cifar_test_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=test_transforms)
+        if 'HLB' in args.model:
+            cifar_test_loader = CifarLoader(cifar_test_data, train=False, batch_size=1000)
+        else:
+            cifar_test_loader = torch.utils.data.DataLoader(cifar_test_data, batch_size=128,num_workers=4)
+
+    if not args.no_poison:
         
-    if args.poison_type == 'Narcissus':
-        test_trigger_loaders = get_poisons_target(args, target_index, test_transforms, target_mask = target_mask_label)
-    else:
-        poison_target_image, target_orig_label = get_poisons_target(args, target_index, test_transforms)
+        if args.poison_type == 'Narcissus':
+            test_trigger_loaders = get_poisons_target(args, target_index, test_transforms, target_mask = target_mask_label)
+        else:
+            poison_target_image, target_orig_label = get_poisons_target(args, target_index, test_transforms)
 
     if args.verbose: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.images)}')
 
@@ -167,23 +117,22 @@ def main(rank, args):
     optimizer = get_optimizer(args,target_net)
 
     # Scheduler
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay, gamma=0.1)
-
-    if args.model in ['HLB','ResNet18_HLB']:
-        total_train_steps = np.ceil(len(train_data_poisoned_ebm) * args.epochs)
+    if 'HLB' in args.model:
+        total_train_steps = np.ceil(len(train_data) * args.epochs)
         lr_schedule = np.interp(np.arange(1+total_train_steps),
                             [0, int(0.2 * total_train_steps), total_train_steps],
                             [0.2, 1, 0]) # triangular learning rate schedule
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule.__getitem__)
         if args.verbose: print(f'Loaded the HLB scheduler with {total_train_steps} steps')
 
-        # init_whitening_conv(target_net[0], poisoned_ebm_loader.images)
+    else:
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay, gamma=0.1)
 
-    # Loss function
-    criterion = nn.CrossEntropyLoss()
-
-    if args.model == 'HLB':
-        criterion = nn.CrossEntropyLoss(label_smoothing=0.2)
+    # Loss function (only used for non-HLB models)
+    if 'HLB' in args.model:
+        criterion = nn.CrossEntropyLoss(reduction='none',label_smoothing=args.label_smoothing)
+    else:
+        criterion = nn.CrossEntropyLoss()
 
     ##############################
     # Run the attack (Training Loop)
@@ -194,21 +143,19 @@ def main(rank, args):
         pbar = tqdm(total=args.epochs)
 
     # Training Logs
-    logs = {'train_loss': [], 'test_acc': [], 'p_acc': []}
+    logs = {'train_loss': [], 'test_acc': []}
 
-    if args.defense == 'Epic':
-        times_selected = torch.zeros(len(train_data_poisoned_ebm), dtype=torch.int32)
-        base_loader = poisoned_ebm_loader
+    if not args.no_poison: 
+        logs['p_acc'] = []
+        if args.poison_type == 'Narcissus': 
+            logs['t_acc'] = []
+
+    if args.dataset == 'cinic10': logs['cifar_acc'] = []
+
+    if args.baseline_defense == 'Epic':
+        times_selected = torch.zeros(len(train_data), dtype=torch.int32)
+        base_loader = train_loader
         logs['subset_size'] = {}
-    if args.defense == 'EBM' and args.purify_freq > 0: 
-        base_loader = poisoned_ebm_loader
-
-    if args.poison_type == 'Narcissus': 
-        logs['t_acc'] = []
-        
-    if args.dataset == 'cinic10':
-        logs['cifar_acc'] = []
-
 
     train_start_time = time.time()
 
@@ -218,154 +165,130 @@ def main(rank, args):
 
         # _______________________________________________________________________________________
         # Craft Friendly Noise if Friendly Defense
-        if args.defense == 'Friendly' and 'friendly' in args.friendly_noise_type and epoch == args.friendly_begin_epoch:
-            friendly_noise = generate_friendly_noise(target_net,poisoned_ebm_loader_noaugs,device,args.device_type,friendly_epochs=args.friendly_epochs,mu=args.friendly_mu,
+        if args.baseline_defense == 'Friendly' and 'friendly' in args.friendly_noise_type and epoch == args.friendly_begin_epoch:
+            friendly_noise = generate_friendly_noise(target_net,train_loader_noaugs,device,args.device_type,friendly_epochs=args.friendly_epochs,mu=args.friendly_mu,
                                                         friendly_lr=args.friendly_lr, clamp_min=-args.friendly_clamp / 255, clamp_max=args.friendly_clamp / 255,model_train=True,
                                                     )
             target_net.zero_grad()
             if args.device_type == 'xla': xm.mark_step()
             if args.verbose: print(f"Friendly noise stats:  Max: {torch.max(friendly_noise)}  Min: {torch.min(friendly_noise)}  Mean (abs): {torch.mean(torch.abs(friendly_noise))}  Mean: {torch.mean(friendly_noise)}")
-            train_data_poisoned_ebm.set_perturbations(friendly_noise)
-            poisoned_ebm_loader = torch.utils.data.DataLoader(train_data_poisoned_ebm, batch_size=args.batch_size, shuffle=True,num_workers=4)
+            train_data.set_perturbations(friendly_noise)
+            train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,num_workers=4)
         # _______________________________________________________________________________________
         # _______________________________________________________________________________________
         # Epic Defense
-        if ((args.defense == 'Epic') and (args.epic_subset_size < 1) and (epoch % args.epic_subset_freq == 0) and (epoch >= args.epic_drop_after) and (epoch <= args.epic_stop_after)):
+        if ((args.baseline_defense == 'Epic') and (args.epic_subset_size < 1) and (epoch % args.epic_subset_freq == 0) and (epoch >= args.epic_drop_after) and (epoch <= args.epic_stop_after)):
 
-            poisoned_ebm_loader = run_epic(args, target_net, base_loader, epoch, device, times_selected)
+            train_loader = run_epic(args, target_net, base_loader, epoch, device, times_selected)
             
-            if args.verbose: print(f'New training set size: {len(poisoned_ebm_loader.dataset)}')
+            if args.verbose: print(f'New training set size: {len(train_loader.dataset)}')
 
-            logs['subset_size'][epoch] = len(poisoned_ebm_loader.dataset)
+            logs['subset_size'][epoch] = len(train_loader.dataset)
         # _______________________________________________________________________________________
-        
-        # Purify if EBM defense and purify every epoch
-        if args.defense == 'EBM' and args.purify_freq > 0 and epoch % args.purify_freq == 0:
-            train_data_poisoned_ebm = PoisonedDataset_EBM(args, 
-                                                          base_loader, 
-                                                          ebm_model, 
-                                                          train_transforms, 
-                                                          device, 
-                                                          n_steps=args.langevin_steps)
-            poisoned_ebm_loader = torch.utils.data.DataLoader(train_data_poisoned_ebm, batch_size=args.batch_size, shuffle=True,num_workers=4)
         
         # Train the model
         logs['train_loss'].append(0)
-        logs['test_acc'].append(0)
-        logs['p_acc'].append(0)
-        if args.poison_type == 'Narcissus': logs['t_acc'].append(0) 
 
         target_net.train()
 
-        for input, target, index, p in poisoned_ebm_loader:
+        for input, target, index, p in train_loader:
             
             input, target = input.to(device), target.to(device)
             output = target_net(input)
 
             # Backward pass
-            if args.model in ['HLB','ResNet18_HLB']:
-                loss = F.cross_entropy(output, target, reduction='none')
-                logs['train_loss'][-1] += loss.mean().item()
-                # train_acc.append((outputs.detach().argmax(1) == labels).float().mean().item())
-                optimizer.zero_grad(set_to_none=True)
+            optimizer.zero_grad()
+            loss = criterion(output, target)
+            if 'HLB' in args.model:
                 loss.sum().backward()
                 optimizer.step()
                 scheduler.step()
+                logs['train_loss'][-1] += loss.mean().item()
             else:
-                optimizer.zero_grad()
-                loss = criterion(output, target)
                 loss.backward()
                 optimizer.step()
-                # Update logs
                 logs['train_loss'][-1] += loss.item()
 
             if args.device_type == 'xla': xm.mark_step()
 
-            if args.defense == 'Epic':
+            if args.baseline_defense == 'Epic':
                 times_selected[index] += 1
 
         # Update logs
-        logs['train_loss'][-1] /= len(poisoned_ebm_loader)
+        logs['train_loss'][-1] /= len(train_loader)
         
         # Decay the learning rate
-        if args.model not in ['HLB','ResNet18_HLB']: scheduler.step()
+        if 'HLB' not in args.model: scheduler.step()
         if args.device_type == 'xla': xm.mark_step()
 
         # Test the model for from_scratch attacks
-        if args.poison_mode == 'from_scratch':
-            if args.model in ['HLB','ResNet18_HLB']:
-                test_acc = eval_HLB(target_net, test_loader, device)
-            else:
-                test_acc = get_test_acc(target_net, test_loader, device)
-            logs['test_acc'][-1] = test_acc
-            
-            if args.dataset == 'cinic10':
-                cifar_acc = get_test_acc(target_net, cifar_test_loader, device)
-                logs['cifar_acc'].append(cifar_acc)
-
-        if args.poison_type == 'Narcissus' and args.poison_mode == 'from_scratch':
-            _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
-            logs['p_acc'][-1] = p_acc
-            logs['t_acc'][-1] = t_acc
-        elif args.poison_mode == 'transfer' and args.poison_type != 'Narcissus':
-            target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
-            pred = torch.argmax(target_pred).item()
-            success = bool(pred == target_mask_label)
-            logs['p_acc'][-1] = success
-
+        logs = eval_epoch(args,target_net, logs, test_loader, device,
+                          test_trigger_loaders = test_trigger_loaders,
+                          poison_target_image = poison_target_image,
+                            target_mask_label = target_mask_label,
+                            target_index = target_index,
+                            )
+        
         # Update progress bar
         if (args.device_type == 'xla' and xm.is_master_ordinal()) or args.device_type != 'xla':
-            pbar.update(1)
-            if args.poison_type == 'Gradient_Matching':
-                pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.4f} | Poison Success {logs["p_acc"][-1]} | ')
-            elif args.poison_type == 'Narcissus':
-                pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | T Acc {logs["test_acc"][-1]:.4f} | P Acc {logs["p_acc"][-1]:.4f} | ')
-            else:
-                pbar.set_description(f'Index {target_index} | Poison Type {args.poison_type} | Defense {args.defense} | Epoch {epoch+1}/{args.epochs}')
+            update_progress_bar(args, pbar, epoch, logs)
 
     training_time = time.time() - train_start_time
 
     # Get the final test accuracy and poison success
     end_acc = get_test_acc(target_net, test_loader, device)
 
-    if args.poison_type != 'Narcissus':
-        target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
-        pred = torch.argmax(target_pred).item()
-        success = bool(pred == target_mask_label)
-        correct_class = bool(pred == target_orig_label)
+    if args.dataset == 'cinic10':
+        cifar_end_acc = get_test_acc(target_net, cifar_test_loader, device)
+
+    if not args.no_poison:
+
+        if args.poison_type != 'Narcissus':
+            target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
+            pred = torch.argmax(target_pred).item()
+            success = bool(pred == target_mask_label)
+            correct_class = bool(pred == target_orig_label)
                        
-    else:
-        p_accs = {}
-        t_accs = {}
-        for i in range(1,4):
-            _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[i], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
-            p_accs[i] = p_acc
-            t_accs[i] = t_acc
+        else:
+            p_accs = {}
+            t_accs = {}
+            for i in range(1,4):
+                _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[i], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
+                p_accs[i] = p_acc
+                t_accs[i] = t_acc
 
     ##############################
     # Save the results and models
     ##############################
-    
-    if args.poison_type != 'Narcissus':
-        get_accs_save_results(args, rank, target_index, end_acc, success, correct_class, training_time, logs)
+                
+    if args.no_poison:
+        get_accs_save_results_clean(args, rank, target_index, end_acc, training_time, logs)
     else:
-        get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_time, logs, p_accs, t_accs)
+        if args.poison_type != 'Narcissus':
+            get_accs_save_results(args, rank, target_index, end_acc, success, correct_class, training_time, logs)
+        else:
+            get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_time, logs, p_accs, t_accs)
 
     # Save the model
     if args.save_models:
-        model_save_dir = os.path.join(args.output_dir,'Models',f'{args.defense}',f'{args.experiment_timestamp}_Index_{target_index}')
+        model_save_dir = os.path.join(args.output_dir,'Models',f'{args.model}',f'{args.data_key}',f'{args.experiment_timestamp}_Index_{target_index}')
         if os.path.exists(model_save_dir) == False: os.makedirs(model_save_dir)
         torch.save(target_net.to('cpu').state_dict(), os.path.join(model_save_dir,'model.pt'))
 
     # Print the results
-    if args.poison_type != 'Narcissus':
-        print(f'Index {target_index} | Poison Type {args.poison_type} | Defense {args.defense} | End Acc {end_acc} | Poison Success {success} | Correct Pred {correct_class} | Training Time {training_time}')
-    elif args.poison_type == 'Narcissus':
-        if args.dataset == 'cinic10':
-            print(f'Index {target_index} | Poison Type {args.poison_type} | Defense {args.defense} | P1 Acc {p_accs[1]:.2%} | T1 Acc {t_accs[1]:.2%} | End Acc {end_acc:.3f}% | CIFAR Acc {cifar_acc:.3f}% | Training Time {training_time:.1f} ')
-        else: 
-            print(f'Index {target_index} | Poison Type {args.poison_type} | Defense {args.defense} | P1 Acc {p_accs[1]:.2%} | T1 Acc {t_accs[1]:.2%} | End Acc {end_acc:.3f}% | Training Time {training_time:.1f}')
-    
+    if args.no_poison:
+        print(f'Index {target_index} | Training Time {training_time} | End Acc {end_acc:.2%}')
+    else:
+        if args.device_type == 'xla' and xm.is_master_ordinal():
+            print(f'Data Key {args.data_key}') 
+        if args.poison_type != 'Narcissus':
+            print(f'Index {target_index} | Poison Type {args.poison_type} | End Acc {end_acc:.2%} | Poison Success {success} | Correct Pred {correct_class} | Training Time {training_time}')
+        elif args.poison_type == 'Narcissus':
+            if args.dataset == 'cinic10': # TODO Fix cifar_acc
+                print(f'Index {target_index} | Poison Type {args.poison_type} | P1 Acc {p_accs[1]:.2%} | T1 Acc {t_accs[1]:.2%} | End Acc {end_acc:.2%} | CIFAR Acc {cifar_end_acc:.2%} | Training Time {training_time:.1f} ')
+            else: 
+                print(f'Index {target_index} | Poison Type {args.poison_type} | P1 Acc {p_accs[1]:.2%} | T1 Acc {t_accs[1]:.2%} | End Acc {end_acc:.2%} | Training Time {training_time:.1f}')
+        
     # Rendezvous 
     if args.device_type == 'xla': xm.rendezvous('training end!')
     
@@ -386,33 +309,34 @@ if __name__ == '__main__':
     parser.add_argument('--num_proc', type=int, default=8, help='number of processes for TPU')
     parser.add_argument('--config_file', default='./Configs/config.ini', type=str, help='path to the config file')
     parser.add_argument('--config_override', default=None, type=str, help='use this to override the specific config settings with a ini section')
-    parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
     parser.add_argument('--seed', default=11, type=int,help='seed for reproducibility')
     parser.add_argument('--save_models', default=False, action='store_true',help="Whether to save the models")
     parser.add_argument('--exp_name', default=None, type=str,help='name of the experiment to append to the output dataframe')
     parser.add_argument('--no_poison', default=False, action='store_true',help='whether to run the attack or not')
+    parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
+    parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
+    parser.add_argument('--output_dir', default='/home/results_EBM_Defense/', type=str, help='path to the output directory')
+    parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
 
     ### Experiment Arguments ###
+    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
+    parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
+    parser.add_argument('--model', default='HLB', type=str, choices=['HLB','ResNet18_HLB','ResNet18','MobileNetV2','DenseNet121'],help='type of model to use')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
     parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--fine_tune', default=False, action='store_true',help="Whether retrain the full model (fine-tuning) or just the linear layer (default: False)")
-    parser.add_argument('--defense', default='EBM', type=str, choices=['None','EBM','Epic','Friendly','Diff','EBM_Diff'],help='type of defense to use')
-    parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
+    parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','Epic','Friendly'],help='type of defense to use')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
-    parser.add_argument('--model', default='ResNet18', type=str, choices=['ResNet18','ResNet18_Basic','HLB','MobileNetV2','DenseNet121'],help='type of model to use')
-
-    ### HLB Arguments ###
-    parser.add_argument('--hlb_flip', default=True, action='store_false',help='whether to use flip in HLB')
-    parser.add_argument('--hlb_translate', default=4, type=int,help='whether to use translate in HLB')
-    parser.add_argument('--hlb_cutout', default=None, type=int,help='whether to use cutout in HLB')
-
-    ### Other Defense and Poison Arguments ###
+    
+    ### Poison Arguments ###
+    parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
+    parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
     parser.add_argument('--iters_bp', default=800, type=int,help='iterations for making poison')
     parser.add_argument('--num_images_bp', default=50, type=int,help='number of poisoned images generated')
     parser.add_argument('--net_repeat_bp', default=1, type=int, help='number of times to repeat the network for methods BP-1, BP-3, BP-5')
     parser.add_argument('--num_per_class_bp', default=50, type=int, help='num of samples per class for re-training, or the poison dataset')
-    parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
-    parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
+
+    ### Baseline Defense Arguments ###
     parser.add_argument('--friendly_noise_type', default=['friendly','bernoulli'], type=str, nargs='*', help='type of noise to apply', choices=["uniform", "gaussian", "bernoulli", "gaussian_blur", "friendly"])
     parser.add_argument('--epic_subset_size', type=float, help='size of the subset', default=0.1)
     parser.add_argument('--epic_drop_after', type=int, help='epoch to start dropping', default=10)
@@ -444,8 +368,6 @@ if __name__ == '__main__':
 
     if args.poison_type == 'Gradient_Matching' and args.poison_mode == 'transfer':
         raise ValueError('Gradient Matching does not support transfer attacks')
-    # if args.poison_type == 'Narcissus' and args.poison_mode == 'transfer':
-    #     raise ValueError('Narcissus does not support transfer attacks')
     if args.poison_type == 'BullseyePolytope_Bench' and args.poison_mode == 'from_scratch':
         raise ValueError('BullseyePolytope_Bench does not support from_scratch attacks')
     if args.poison_type == 'BullseyePolytope' and args.poison_mode == 'from_scratch':
@@ -454,6 +376,8 @@ if __name__ == '__main__':
         raise ValueError('selected_indices only supported for TPU')
     if args.selected_indices is not None and args.poison_mode != 'from_scratch':
         raise ValueError('selected_indices only supported for from_scratch attacks')
+    if args.baseline_defense != 'None' and args.data_key != 'Baseline':
+        raise ValueError('Baseline defenses only supported for baseline data')
 
     ##############
     # Directories
@@ -463,18 +387,20 @@ if __name__ == '__main__':
     if args.remote_user is not None:
         args.data_dir = args.data_dir.replace('/home',f'/home/{args.remote_user}')
         args.output_dir = args.output_dir.replace('/home',f'/home/{args.remote_user}')
-        args.models_dir = args.models_dir.replace('/home',f'/home/{args.remote_user}')
 
     # Create the output directory and get the timestamp
     args.experiment_timestamp = time.strftime("%Y_%m_%d_%H_%M", time.localtime())
-    if args.poison_mode == 'from_scratch':
-        sub_folder = args.poison_mode.title()
+    if args.no_poison:
+        args.output_dir = os.path.join(args.output_dir, 'Clean')
     else:
-        if args.fine_tune:
-            sub_folder = f'{args.poison_mode.title()}_FineTune'
+        if args.poison_mode == 'from_scratch':
+            sub_folder = args.poison_mode.title()
         else:
-            sub_folder = f'{args.poison_mode.title()}_Linear'
-    args.output_dir = os.path.join(args.output_dir, sub_folder, args.poison_type)
+            if args.fine_tune:
+                sub_folder = f'{args.poison_mode.title()}_FineTune'
+            else:
+                sub_folder = f'{args.poison_mode.title()}_Linear'
+        args.output_dir = os.path.join(args.output_dir, sub_folder, args.poison_type)
     if os.path.exists(args.output_dir) == False: os.makedirs(args.output_dir)
 
     # Print the arguments
@@ -494,7 +420,11 @@ if __name__ == '__main__':
     if args.poison_mode == 'from_scratch':
     
         if args.device_type == 'xla' and args.num_proc > 1:
-            xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
+            if args.poison_type == 'Narcissus' and args.selected_indices is None:
+                for args.start_target_index in [0,8]:
+                    xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
+            else:
+                xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
         else:
             main(0, args)
     else:
