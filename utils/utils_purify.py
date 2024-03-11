@@ -58,9 +58,9 @@ def save_poisons(args,poison_tuple_list, poison_indices, target, data_key):
         else: bp_subpath = 'linear-transfer-learning'
         if args.num_images_bp == 5: bp_subpath = os.path.join(bp_subpath, f'mean-{args.net_repeat_bp}Repeat')
         else: bp_subpath = os.path.join(bp_subpath, f'mean')
-        save_dir = os.path.join(args.data_dir, subfolder, f'Bullseye_Polytope/attack-results-{args.num_images_bp}poisons/100-overlap/{bp_subpath}/{args.iters_bp}')
+        save_dir = os.path.join(args.data_dir, subfolder, f'Bullseye_Polytope/{args.num_images_bp}-imgs/{bp_subpath}/{args.iters_bp}-iters')
     elif args.poison_type == 'BullseyePolytope_Bench':
-        save_dir = os.path.join(args.data_dir, subfolder, f'Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}')
+        save_dir = os.path.join(args.data_dir, subfolder, f'Transfer_Bench/bp_poisons/{args.num_images_bp}-imgs')
 
     if not os.path.exists(os.path.join(save_dir, data_key)):
         os.makedirs(os.path.join(save_dir, data_key))

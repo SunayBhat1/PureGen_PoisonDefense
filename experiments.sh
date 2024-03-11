@@ -15,8 +15,34 @@
 ### Node9
 
 ### Node1 Base: Testing HLB Integrations
-python3 run.py --remote_user 'sunaybhat' --config_override 'HLB' --defense 'None' --num_proc 1 --v;
 
+
+# Clean HLB Runs
+python3 train_classifier.py --remote_user 'sunaybhat' --no_poison --num_proc 1;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED --no_poison --num_proc 1;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --no_poison --num_proc 1;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1;
+
+# Poisoned HLB Runs Baseline
+(
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
+
+python3 train_classifier.py --remote_user 'sunaybhat';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB;
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
+
+python3 train_classifier.py --remote_user 'sunaybhat' --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --noise_eps_narcissus 16;
+)
+
+# ResNet18 Testing
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --no_poison --num_proc 1;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18;
 
 
 ### Node 8: Train STL EBM
@@ -31,6 +57,8 @@ python3 run.py --dataset 'stl10'
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
+
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None;
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None --poison_type 'Narcissus';

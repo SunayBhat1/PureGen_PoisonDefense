@@ -9,13 +9,13 @@ import torch.nn.init as init
 import math
 
 
-def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,penul_features=512):
+def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,penul_features=512,hlb_type='small'):
     if model_name == 'ResNet18': 
         model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn, penul_features=penul_features)
     elif model_name == 'ResNet18_HLB':
-        model = ResNet18_Basic()
+        model = ResNet18_HLB()
     elif model_name == 'HLB':
-        model = make_hlb_net()
+        model = make_hlb_net(hlb_type)
     elif model_name == 'MobileNetV2':
         model = MobileNetV2(num_classes=num_classes)
     elif model_name == 'DenseNet121':
@@ -762,7 +762,7 @@ class NFNet(nn.Module):
 
 
 ################
-# ResNet18_Basic #
+# ResNet18_HLB #
 ################
 
 '''ResNet in PyTorch.
@@ -798,9 +798,9 @@ class BasicBlock_Basic(nn.Module):
         out += self.shortcut(x)
         return F.relu(out)
 
-class ResNet_Basic(nn.Module):
+class ResNet_HLB(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10):
-        super(ResNet_Basic, self).__init__()
+        super(ResNet_HLB, self).__init__()
 
         widths = [64, 128, 256, 512]
 
@@ -833,26 +833,13 @@ class ResNet_Basic(nn.Module):
         final = self.linear(pre_out)
         return final
 
-def ResNet18_Basic(**kwargs):
-    return ResNet_Basic(BasicBlock_Basic, [2,2,2,2], **kwargs)
+def ResNet18_HLB(**kwargs):
+    return ResNet_HLB(BasicBlock_Basic, [2,2,2,2], **kwargs)
 
 
 #####################
 # HyoperLight Bench #
 #####################
-
-### Hyperparameters ###
-hyp = {
-    'net': {
-        'whitening': {
-            'kernel_size': 2,
-        },
-        'batchnorm_momentum': 0.7,
-        'base_width': 64,
-        'scaling_factor': 1/9,
-        'tta_level': 2,         # the level of test-time augmentation: 0=none, 1=mirror, 2=mirror+translate
-    },
-}
 
 ### Network Components ###
 class HLB_Flatten(nn.Module):
@@ -867,7 +854,7 @@ class HLB_Mul(nn.Module):
         return x * self.scale
 
 class HLB_BatchNorm(nn.BatchNorm2d):
-    def __init__(self, num_features, eps=1e-12, momentum=hyp['net']['batchnorm_momentum'],
+    def __init__(self, num_features, eps=1e-12, momentum=0.6,
                  weight=False, bias=True):
         super().__init__(num_features, eps=eps, momentum=1-momentum)
         self.weight.requires_grad = weight
@@ -887,46 +874,79 @@ class HLB_Conv(nn.Conv2d):
         torch.nn.init.dirac_(w[:w.size(1)])
 
 class HLB_ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out):
+    def __init__(self, channels_in, channels_out,heavy=False,momentum=0.6):
         super().__init__()
         self.conv1 = HLB_Conv(channels_in,  channels_out)
         self.pool = nn.MaxPool2d(2)
-        self.norm1 = HLB_BatchNorm(channels_out)
+        self.norm1 = HLB_BatchNorm(channels_out, momentum=momentum)
         self.conv2 = HLB_Conv(channels_out, channels_out)
         self.norm2 = HLB_BatchNorm(channels_out)
         self.activ = nn.GELU()
-        # self.conv3 = Conv(channels_out, channels_out)
-        # self.norm3 = BatchNorm(channels_out)        
+
+        self.heavy = heavy
+        if heavy:
+            self.conv3 = HLB_Conv(channels_out, channels_out)
+            self.norm3 = HLB_BatchNorm(channels_out, momentum=momentum)     
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.pool(x)
         x = self.norm1(x)
         x = self.activ(x)
+        if self.heavy:
+            x0 = x
         x = self.conv2(x)
         x = self.norm2(x)
-        x = self.activ(x)      
+        if self.heavy:
+            x = self.activ(x)
+            x = self.conv3(x)
+            x = self.norm3(x)
+        x = self.activ(x) 
+        if self.heavy:
+            x += x0     
         return x
 
 #### Network Definition ###
 
-def make_hlb_net():
+def make_hlb_net(hlb_type='small'):
+
+    hlb_args = {
+                'block_sizes': [1,4,4],
+                'heavy': False,
+                'whitening': {
+                    'kernel_size': 2,
+                },
+                'batchnorm_momentum': 0.7,
+                'base_width': 64,
+                'scaling_factor': 1/9,
+            }
+    
+    if hlb_type == 'medium':
+        hlb_args['block_sizes'] = [2, 6, 6]
+        hlb_args['batchnorm_momentum'] = 0.6
+
+    if hlb_type == 'large':
+        hlb_args['heavy'] = True
+        hlb_args['block_sizes'] = [1,4,4]
+        hlb_args['batchnorm_momentum'] = 0.6
+        hlb_args['base_width'] = 128
+        
     widths = {
-        'block1': (1 * hyp['net']['base_width']), # 64  w/ width at base value
-        'block2': (4 * hyp['net']['base_width']), # 256 w/ width at base value
-        'block3': (4 * hyp['net']['base_width']), # 256 w/ width at base value
+        'block1': (hlb_args['block_sizes'][0] * hlb_args['base_width']), # 64  w/ width at base value
+        'block2': (hlb_args['block_sizes'][1] * hlb_args['base_width']), # 256 w/ width at base value
+        'block3': (hlb_args['block_sizes'][2] * hlb_args['base_width']), # 256 w/ width at base value
     }
-    whiten_conv_width = 2 * 3 * hyp['net']['whitening']['kernel_size']**2
+    whiten_conv_width = 2 * 3 * hlb_args['whitening']['kernel_size']**2
     net = nn.Sequential(
-        HLB_Conv(3, whiten_conv_width, kernel_size=hyp['net']['whitening']['kernel_size'], padding=0),
-        HLB_BatchNorm(whiten_conv_width),
+        HLB_Conv(3, whiten_conv_width, kernel_size=hlb_args['whitening']['kernel_size'], padding=0),
+        HLB_BatchNorm(whiten_conv_width,momentum=hlb_args['batchnorm_momentum']),
         nn.GELU(),
-        HLB_ConvGroup(whiten_conv_width, widths['block1']),
-        HLB_ConvGroup(widths['block1'],  widths['block2']),
-        HLB_ConvGroup(widths['block2'],  widths['block3']),
+        HLB_ConvGroup(whiten_conv_width, widths['block1'],heavy=hlb_args['heavy'],momentum=hlb_args['batchnorm_momentum']),
+        HLB_ConvGroup(widths['block1'],  widths['block2'],heavy=hlb_args['heavy'],momentum=hlb_args['batchnorm_momentum']),
+        HLB_ConvGroup(widths['block2'],  widths['block3'],heavy=hlb_args['heavy'],momentum=hlb_args['batchnorm_momentum']),
         nn.MaxPool2d(3),
         HLB_Flatten(),
         nn.Linear(widths['block3'], 10, bias=False),
-        HLB_Mul(hyp['net']['scaling_factor']),
+        HLB_Mul(hlb_args['scaling_factor']),
     )
     return net
