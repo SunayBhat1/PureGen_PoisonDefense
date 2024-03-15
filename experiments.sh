@@ -16,6 +16,8 @@
 
 ### Node1 Base: Testing HLB Integrations
 
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1 --dataset 'stl10';
+
 
 # Clean HLB Runs
 python3 train_classifier.py --remote_user 'sunaybhat' --no_poison --num_proc 1;
@@ -27,7 +29,7 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB 
 (
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
 
-python3 train_classifier.py --remote_user 'sunaybhat';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED;
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE;
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB;
@@ -39,6 +41,11 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED 
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --noise_eps_narcissus 16;
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --noise_eps_narcissus 16;
 )
+
+## STL 10
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --poison_type 'Narcissus';
+
 
 # ResNet18 Testing
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --no_poison --num_proc 1;
@@ -55,9 +62,9 @@ python3 run.py --dataset 'stl10'
 # Purificatiion #
 ####################
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --dataset 'stl10' --num_images_narcissus 100;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --dataset 'stl10' --num_images_narcissus 100;
 
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None;

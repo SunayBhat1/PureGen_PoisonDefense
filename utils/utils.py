@@ -14,6 +14,12 @@ from utils.utils_optim import *
 try: import torch_xla.core.xla_model as xm
 except: pass
 
+dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
+                'cinic10':{'num_classes':10,'img_dim':32},
+                'tiny_imagenet':{'num_classes':200,'img_dim':64},
+                'stl10':{'num_classes':10,'img_dim':96},
+                }
+                
 def set_args_from_config(args, config, section_name):
 
     for key, value in config[section_name].items():
@@ -88,8 +94,11 @@ def set_target_index_and_check_end(args, rank):
 
 def load_target_network(args,device):
 
+    num_classes = dataset_dict[args.dataset]['num_classes']
+    img_dim = dataset_dict[args.dataset]['img_dim']
+
     if args.poison_mode == 'from_scratch' or args.fine_tune:
-        target_net = load_model(args.model,hlb_type=args.hlb_type)
+        target_net = load_model(args.model,hlb_type=args.hlb_type, num_classes=num_classes, img_size=img_dim)
     elif args.poison_type == 'BullseyePolytope':
         target_net = load_model(args.model, eval_bn=True)
     elif args.poison_type == 'BullseyePolytope_Bench':
@@ -212,7 +221,7 @@ def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=
 
     # Test the model for from_scratch attacks
     if args.poison_mode == 'from_scratch':
-        if 'HLB' in args.model:
+        if 'HLB' in args.model and args.dataset == 'cifar10':
             test_acc = eval_HLB(target_net, test_loader, device)
         else:
             test_acc = get_test_acc(target_net, test_loader, device)
@@ -445,3 +454,35 @@ def concat_result_dataframes_xla(args):
     for df_path in df_paths:
         os.remove(df_path)
 
+##################
+# Argparse Import Helper Functions
+##################
+
+def int_or_int_list(s):
+    if ',' in s:
+        try:
+            return [int(item) for item in s.split(',')]
+        except ValueError:
+            return int(s)
+    else:
+        return int(s)
+    
+def float_or_float_list(s):
+    if ',' in s:
+        try:
+            return [float(item) for item in s.split(',')]
+        except ValueError:
+            return float(s)
+    else:
+        return float(s)
+
+def str_or_str_list(s):
+    if ',' in s:
+        return s.split(',')
+    else:
+        return s
+
+def none_or_str(value):
+    if value == 'None':
+        return None
+    return value

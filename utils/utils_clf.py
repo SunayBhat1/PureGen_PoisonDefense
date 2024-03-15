@@ -23,6 +23,9 @@ cifar_std = (0.2023, 0.1994, 0.2010)
 cifar_mean_gm = (0.4914, 0.4822, 0.4465)
 cifar_std_gm = (0.2471, 0.2435, 0.2616)
 
+stl10_mean = (0.4914, 0.4822, 0.4465)
+stl10_std = (0.2471, 0.2435, 0.2616)
+
 # dataset_info dict
 dataset_info = {'from_scratch':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 5000},
@@ -104,11 +107,11 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
     train_data = PoisonedDataset(base_loader, poisoned = not args.no_poison, transform=train_transforms)
 
-    if 'HLB' in args.model:
+    if 'HLB' in args.model and args.dataset == 'cifar10':
         aug = {'flip': args.hlb_flip}
         if args.hlb_translate is not None: aug['translate'] = args.hlb_translate
         if args.hlb_cutout is not None: aug['cutout'] = args.hlb_cutout
-        train_data = CifarLoader(train_data.data, train=True, batch_size=args.batch_size, aug=aug, device=device)
+        train_data = CifarLoader(train_data.data, train=True, batch_size=args.batch_size, aug=aug, device=device,dataset_name=args.dataset)
 
     return train_data, target_mask_label
 
@@ -294,7 +297,7 @@ class PoisonedDataset_Bench(data.Dataset):
 
 class CifarLoader:
 
-    def __init__(self, dataset, train=True, batch_size=500, aug=None, drop_last=None, shuffle=None, device=0):
+    def __init__(self, dataset, train=True, batch_size=500, aug=None, drop_last=None, shuffle=None, device=0,dataset_name='cifar10'):
 
         if train:
             self.images, self.labels, self.indices, self.p_values = zip(*dataset)
@@ -306,17 +309,35 @@ class CifarLoader:
             self.p_values = torch.tensor(self.p_values)
         else:
             self.images = torch.tensor(dataset.data)
-            self.labels = torch.tensor(dataset.targets)
+            if dataset_name in ['cifar10','cinic10']:
+                self.labels = torch.tensor(dataset.targets)
+            elif dataset_name == 'stl10':
+                self.labels = torch.tensor(dataset.labels)
+            else:
+                raise Exception(f"Dataset {dataset_name} not supported for HLB Loader")
 
 
         # It's faster to load+process uint8 data than to load preprocessed fp16 data
         self.images = (self.images / 255).permute(0, 3, 1, 2).to(memory_format=torch.channels_last)
 
-        self.normalize = transforms.Normalize(cifar_mean, cifar_std)
-        self.denormalize = transforms.Normalize(
-                                tuple(-mean / std for mean, std in zip(cifar_mean, cifar_std)), 
-                                tuple(1 / std for std in cifar_std)
-                            )
+        if dataset_name == 'cifar10':
+            self.normalize = transforms.Normalize(cifar_mean, cifar_std)
+            self.denormalize = transforms.Normalize(
+                                    tuple(-mean / std for mean, std in zip(cifar_mean, cifar_std)), 
+                                    tuple(1 / std for std in cifar_std)
+                                )
+        elif dataset_name == 'cinic10':
+            self.normalize = transforms.Normalize(cifar_mean, cifar_std)
+            self.denormalize = transforms.Normalize(
+                                    tuple(-mean / std for mean, std in zip(cifar_mean, cifar_std)), 
+                                    tuple(1 / std for std in cifar_std)
+                                )
+        elif dataset_name == 'stl10':
+            self.normalize = transforms.Normalize(stl10_mean, stl10_std)
+            self.denormalize = transforms.Normalize(
+                                    tuple(-mean / std for mean, std in zip(stl10_mean, stl10_std)), 
+                                    tuple(1 / std for std in stl10_std)
+                                )
         
         self.aug = aug or {}
         for k in self.aug.keys():
@@ -489,9 +510,20 @@ def batch_cutout(inputs, size):
     
 def get_train_transforms(args):
     if args.poison_mode == 'from_scratch' or args.poison_type in ['BullseyePolytope_Bench','Narcissus']:
-        train_transforms = [transforms.RandomCrop(32, padding=4),
-                                            transforms.RandomHorizontalFlip(),
-                                            transforms.ToTensor()]
+        if args.dataset in ['cifar10','cinic10']:
+            train_transforms = [transforms.RandomCrop(32, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        elif args.dataset == 'stl10':
+            train_transforms = [transforms.RandomCrop(96, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        elif args.dataset == 'tiny-imagenet':
+            train_transforms = [transforms.RandomCrop(64, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        else:
+            raise Exception(f"Dataset {args.dataset} transforms not supported for from_scratch poison mode")
     elif args.poison_mode == 'transfer' and args.poison_type == 'BullseyePolytope':
         train_transforms = [transforms.ToTensor()]
 
@@ -513,7 +545,12 @@ def get_train_transforms(args):
             train_transforms.append(BernoulliNoise(eps=args.friendly_noise_eps / 255))
 
     if args.poison_mode == 'from_scratch':
-        train_transforms.append(transforms.Normalize(cifar_mean_gm, cifar_std_gm))
+        if args.dataset == 'cifar10':
+            train_transforms.append(transforms.Normalize(cifar_mean_gm, cifar_std_gm))
+        elif args.dataset == 'cinic10':
+            train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
+        elif args.dataset == 'stl10':
+            train_transforms.append(transforms.Normalize(stl10_mean, stl10_std))
     elif args.poison_mode == 'transfer':
         train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
 
@@ -680,9 +717,19 @@ def get_target_narcissus(data_dir, dataset, poison, label, transform_test, multi
     best_noise = torch.from_numpy(poison)
     if dataset == 'cifar10':
         test_dataset = torchvision.datasets.CIFAR10(root=data_dir, train=False, download=(not os.path.exists(os.path.join(data_dir, 'cifar-10-batches-py'))))
+        test_labels = np.array(test_dataset.targets)
     elif dataset == 'cinic10':
         test_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'CINIC-10/test'))
-    test_labels = np.array(test_dataset.targets)
+        test_labels = np.array(test_dataset.targets)
+    elif dataset == 'tiny-imagenet':
+        test_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'tiny-imagenet-200/test'))
+        test_labels = np.array(test_dataset.targets)
+    elif dataset == 'stl10':
+        test_dataset = torchvision.datasets.STL10(root=data_dir, split='test', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
+        test_labels = np.array(test_dataset.labels)
+    else:
+        raise Exception(f"Dataset {dataset} not supported for Narcissus poison mode Test Data")
+    
     test_target_list = np.where(test_labels != label)[0]
     return Trigger_Test_Dataset(test_dataset, test_target_list, best_noise * multi_test, label, transform=transform_test, clean=clean)
 

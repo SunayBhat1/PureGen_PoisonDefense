@@ -9,11 +9,11 @@ import torch.nn.init as init
 import math
 
 
-def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,penul_features=512,hlb_type='small'):
+def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,hlb_type='small',img_size=32):
     if model_name == 'ResNet18': 
-        model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn, penul_features=penul_features)
+        model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn,img_size=img_size)
     elif model_name == 'ResNet18_HLB':
-        model = ResNet18_HLB()
+        model = ResNet18_HLB(img_size=img_size, num_classes=num_classes)
     elif model_name == 'HLB':
         model = make_hlb_net(hlb_type)
     elif model_name == 'MobileNetV2':
@@ -209,7 +209,7 @@ class ResNet18Style(nn.Module):
         middle_feat_num=1,
         eval_bn=False,
         grad_bn=False,
-        penul_features=512,
+        img_size=32,
     ):
         super(ResNet18Style, self).__init__()
         self.in_planes = 64
@@ -280,7 +280,8 @@ class ResNet18Style(nn.Module):
             bdp=bdp,
             eval_bn=eval_bn,
         )
-        self.linear = nn.Linear(penul_features * block.expansion, num_classes)
+        img_size = img_size // 2 // 2 // 2 // 4
+        self.linear = nn.Linear(512*img_size*img_size, num_classes)
 
         self.test_dp = test_dp
         self.middle_feat_num = middle_feat_num
@@ -799,7 +800,7 @@ class BasicBlock_Basic(nn.Module):
         return F.relu(out)
 
 class ResNet_HLB(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
+    def __init__(self, block, num_blocks, num_classes=10,img_size=32):
         super(ResNet_HLB, self).__init__()
 
         widths = [64, 128, 256, 512]
@@ -812,7 +813,8 @@ class ResNet_HLB(nn.Module):
         self.layer2 = self._make_layer(block, widths[1], num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, widths[2], num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, widths[3], num_blocks[3], stride=2)
-        self.linear = nn.Linear(widths[3], num_classes)
+        img_size = img_size // 2 // 2 // 2 // 4
+        self.linear = nn.Linear(widths[3]*img_size*img_size, num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
