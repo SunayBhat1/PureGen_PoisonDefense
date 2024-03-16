@@ -13,12 +13,6 @@ from utils.utils_optim import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass
-
-dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
-                'cinic10':{'num_classes':10,'img_dim':32},
-                'tiny_imagenet':{'num_classes':200,'img_dim':64},
-                'stl10':{'num_classes':10,'img_dim':96},
-                }
                 
 def set_args_from_config(args, config, section_name):
 
@@ -92,126 +86,6 @@ def set_target_index_and_check_end(args, rank):
 
     return target_index
 
-def load_target_network(args,device):
-
-    num_classes = dataset_dict[args.dataset]['num_classes']
-    img_dim = dataset_dict[args.dataset]['img_dim']
-
-    if args.poison_mode == 'from_scratch' or args.fine_tune:
-        target_net = load_model(args.model,hlb_type=args.hlb_type, num_classes=num_classes, img_size=img_dim)
-    elif args.poison_type == 'BullseyePolytope':
-        target_net = load_model(args.model, eval_bn=True)
-    elif args.poison_type == 'BullseyePolytope_Bench':
-        target_net = load_model(args.model, num_classes=100, eval_bn=True)
-    else:
-        target_net = load_model(args.model)
-
-    # Load state dict for transfer learning
-    if args.poison_mode == 'transfer':
-            
-        # Use benchmark if running BullseyePolytope_Bench
-        if args.poison_type == 'BullseyePolytope_Bench':
-            model_path = 'ResNet18_CIFAR100.pth'
-        else:
-            model_path = args.model_path
-
-        state_dict_path = os.path.join(args.data_dir,'models', 'transfer_models', model_path)
-        state_dict_module = torch.load(state_dict_path,map_location=torch.device('cpu'))['net']
-        state_dict = {}
-        for k,v in state_dict_module.items():
-            state_dict[k.replace('module.', '')] = v
-        target_net.load_state_dict(state_dict)
-
-        if args.verbose: print(f'Loaded the target network from {state_dict_path}')
-
-    # Move target_net to device
-    if 'HLB' in args.model:
-        target_net = target_net.to(device).to(memory_format=torch.channels_last)
-    else:
-        target_net = target_net.to(device)
-
-    # Reinit Linear layer for transfer learning
-    if args.poison_mode == 'transfer' and args.reinit_linear:
-        if args.model == 'ResNet18':
-            target_net.linear = nn.Linear(512, 10).to(device)
-        elif args.model == 'DenseNet121':
-            target_net.linear = nn.Linear(1024, 10).to(device)
-        elif args.model == 'MobileNetV2':
-            target_net.linear = nn.Linear(1280, 10).to(device)
-        if args.verbose: print(f'Reinitialized the linear layer of the target network')
-
-    return target_net
-
-def get_optimizer(args,target_net):
-
-    if args.poison_mode == 'from_scratch':
-
-        if args.model == 'ResNet18_HLB':
-            optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
-                                weight_decay=args.weight_decay*args.batch_size)
-            
-            return optimizer
-        
-        elif args.model == 'HLB':
-            kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
-            lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
-            wd = args.weight_decay * args.batch_size / kilostep_scale
-            lr_biases = lr * args.bias_scaler
-
-            norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
-            other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
-            param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
-                            dict(params=other_params, lr=lr, weight_decay=wd/lr)]
-            optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)    
-            
-        elif args.optim == 'adam':
-            optimizer = torch.optim.Adam(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-
-        elif args.optim == 'sgd':
-            no_decay = ['bias', 'bn']
-            grouped_parameters = [
-                {'params': [p for n, p in target_net.named_parameters() if not any(
-                    nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
-                {'params': [p for n, p in target_net.named_parameters() if any(
-                    nd in n for nd in no_decay)], 'weight_decay': 0.0}
-            ]
-            optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
-
-        elif args.optim == 'smd':
-            no_decay = ['bias', 'bn']
-            grouped_parameters = [
-                {'params': [p for n, p in target_net.named_parameters() if not any(
-                    nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
-                {'params': [p for n, p in target_net.named_parameters() if any(
-                    nd in n for nd in no_decay)], 'weight_decay': 0.0}
-            ]
-            optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True,q=1.5)
-        elif  args.optim == 'adamwq':
-            # optimizer = AdamWq(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay,q=1.25)
-            lr_biases = 9e-3 * 128
-            norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
-            other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
-            param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=5e-4),
-                            dict(params=other_params, lr=9e-3, weight_decay=5e-4)]            
-            # optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
-            # optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, q=1.5, momentum=args.momentum, nesterov=True)
-            optimizer = AdamWq(param_configs, betas=(0.9,0.999),q=1.5,eps=5e-7)
-            # optimizer = XMatP(target_net.parameters(), lr_params=2e-2, preconditioner_init_scale=None,
-            #                   grad_clip_max_norm=100,momentum=0.9,regularization=1.5,preconditioner_update_probability=0.1)            
-            
-    elif args.poison_mode == 'transfer':
-
-        if args.fine_tune:
-            params = target_net.parameters()
-        else:
-            params = target_net.get_penultimate_params_list()
-
-        if args.optim == 'adam':
-            optimizer = torch.optim.Adam(params, lr=args.lr, weight_decay=args.weight_decay)
-        elif args.optim == 'sgd':
-            optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
-    return optimizer
 
 ####################
 # Eval Functions   #
