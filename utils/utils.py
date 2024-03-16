@@ -343,7 +343,7 @@ def get_accs_save_results_clean(args, rank, target_index, end_acc, training_time
     else:
         df_path = os.path.join(args.output_dir,'Results.csv')
 
-    df = pd.DataFrame(columns=['Model','Target Index','End Acc','Exp Name','Calc Time','Args','Logs','Train Time'])
+    df = pd.DataFrame(columns=['Model','Dataset','Target Index','End Acc','Exp Name','Calc Time','Args','Logs','Train Time'])
 
     # Convert args to a dictionary and then a json string
     args_dict = vars(args)
@@ -356,7 +356,8 @@ def get_accs_save_results_clean(args, rank, target_index, end_acc, training_time
     logs_str = json.dumps(logs)
 
     # Append results to the dataframe
-    df = pd.concat([df, pd.DataFrame({'Model': args.model, 'Target Index': target_index,
+    df = pd.concat([df, pd.DataFrame({'Model': args.model, 'Dataset': args.dataset,
+                                            'Target Index': target_index,
                                             'End Acc': end_acc,
                                             'Exp Name': args.exp_name,
                                             'Calc Time': args.experiment_timestamp,
@@ -372,7 +373,7 @@ def get_accs_save_results(args, rank, target_index, end_acc, success, correct_cl
     else:
         df_path = os.path.join(args.output_dir,'Results.csv')
 
-    df = pd.DataFrame(columns=['Data Key','Model','Target Index','End Acc','Success','Correct Pred','Exp Name','Calc Time','Args','Logs','Train Time'])
+    df = pd.DataFrame(columns=['Data Key','Model','Dataset','Target Index','End Acc','Success','Correct Pred','Exp Name','Calc Time','Args','Logs','Train Time'])
 
     # Convert args to a dictionary and then a json string
     args_dict = vars(args)
@@ -385,7 +386,7 @@ def get_accs_save_results(args, rank, target_index, end_acc, success, correct_cl
     logs_str = json.dumps(logs)
 
     # Append results to the dataframe
-    df = pd.concat([df, pd.DataFrame({'Data Key': args.data_key, 'Model': args.model,
+    df = pd.concat([df, pd.DataFrame({'Data Key': args.data_key, 'Model': args.model, 'Dataset': args.dataset,
                                         'Target Index': target_index, 
                                         'End Acc': end_acc,
                                         'Success': success, 'Correct Pred': correct_class,
@@ -404,7 +405,7 @@ def get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_
     else:
         df_path = os.path.join(args.output_dir,'Results.csv')
 
-    df = pd.DataFrame(columns=['Data Key','Model','Target Index','End Acc',
+    df = pd.DataFrame(columns=['Data Key','Model','Dataset','Target Index','End Acc',
                                 'P1 Acc','T1 Acc','Exp Name',
                                 'Calc Time','Train Time',
                                 'P2 Acc','T2 Acc', 'P3 Acc','T3 Acc',
@@ -421,7 +422,7 @@ def get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_
     # Convert the logs to a json string
     logs_str = json.dumps(logs)
 
-    df = pd.concat([df, pd.DataFrame({'Data Key': args.data_key, 'Model': args.model,
+    df = pd.concat([df, pd.DataFrame({'Data Key': args.data_key, 'Model': args.model, 'Dataset': args.dataset,
                                         'Target Index': target_index, 
                                         'End Acc': end_acc,
                                         'P1 Acc': p_accs[1], 'T1 Acc': t_accs[1],

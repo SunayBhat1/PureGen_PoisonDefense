@@ -19,6 +19,9 @@
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1 --dataset 'stl10';
 
 
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
+
+
 # Clean HLB Runs
 python3 train_classifier.py --remote_user 'sunaybhat' --no_poison --num_proc 1;
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED --no_poison --num_proc 1;

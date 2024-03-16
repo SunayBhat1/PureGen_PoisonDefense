@@ -12,6 +12,8 @@ import math
 def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,hlb_type='small',img_size=32):
     if model_name == 'ResNet18': 
         model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn,img_size=img_size)
+    elif model_name == 'ResNet34':
+        model = ResNet18Style(RN18BasicBlock, [3,4,6,3], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn,img_size=img_size)
     elif model_name == 'ResNet18_HLB':
         model = ResNet18_HLB(img_size=img_size, num_classes=num_classes)
     elif model_name == 'HLB':
