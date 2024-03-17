@@ -46,9 +46,9 @@ def main(rank, args):
         purify_pbar = False
 
     # Get diff and ebm model paths
-    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.dataset,args.ebm_name+'.pt')
+    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.ebm_name+'.pt')
     else: ebm_path = None
-    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.dataset,args.diff_name+'.pt')
+    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.diff_name+'.pt')
     else: diff_path = None
 
     # Create the PureDefense object

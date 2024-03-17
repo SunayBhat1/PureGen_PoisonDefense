@@ -12,12 +12,9 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --poison_type 'Narcissus';
 
-
-
-
 ### Node 8: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48;
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48 --lr 1e-5;
 
 ### Node 7: Train small EBMS CINIC-10 
 python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'; 
@@ -58,7 +55,6 @@ rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/Research/data_
 # Copy EBM Data down to local
 rsync -av "sunaybhat@node7:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
 rsync -av "sunaybhat@node8:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
-rsync -av "sunaybhat@node9:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
 
 
 # Copy Cifar10 Split Data
