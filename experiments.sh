@@ -65,9 +65,9 @@ python3 run.py --dataset 'stl10'
 # Purificatiion #
 ####################
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10';
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --dataset 'stl10' --num_images_narcissus 100;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --dataset 'stl10' --num_images_narcissus 100;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10_64';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --dataset 'stl10_64' --num_images_narcissus 100;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --dataset 'stl10_64' --num_images_narcissus 100;
 
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None;

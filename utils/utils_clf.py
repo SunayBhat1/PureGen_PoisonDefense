@@ -32,7 +32,7 @@ stl10_std = (0.2471, 0.2435, 0.2616)
 dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
                 'cinic10':{'num_classes':10,'img_dim':32},
                 'tiny_imagenet':{'num_classes':200,'img_dim':64},
-                'stl10':{'num_classes':10,'img_dim':96},
+                'stl10':{'num_classes':10,'img_dim':64},
                 }
 
 # dataset_info dict
@@ -524,7 +524,7 @@ def get_train_transforms(args):
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
         elif args.dataset == 'stl10':
-            train_transforms = [transforms.RandomCrop(96, padding=4),
+            train_transforms = [transforms.RandomCrop(64, padding=4),
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
         elif args.dataset == 'tiny-imagenet':

@@ -168,7 +168,7 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
         elif dataset == 'cinic10':
             base_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'CINIC-10/valid'))
             train_labels = np.array(base_dataset.targets)
-        elif dataset == 'stl10':
+        elif dataset in ['stl10', 'stl10_64']:
             base_dataset = torchvision.datasets.STL10(root=data_dir, split='train', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
             train_labels = np.array(base_dataset.labels)
         
@@ -178,6 +178,8 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
     # If the dataset is STL-10, resize the poison patches to 96x96
     if dataset == 'stl10':
         best_noise = F.interpolate(best_noise, size=(96, 96), mode='bilinear', align_corners=False)
+    elif dataset == 'stl10_64':
+        best_noise = F.interpolate(best_noise, size=(64, 64), mode='bilinear', align_corners=False)
     
     train_target_list = np.where(train_labels == label)[0]
     
@@ -191,9 +193,13 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
         # print(f"Poisoning {poison_amount} images from random selection")
         train_target_list = np.random.choice(train_target_list, poison_amount, replace=False)
 
-        
-    forward_transform = transforms.Compose([transforms.ToTensor(), 
+    
+    if dataset == 'stl10_64':
+        forward_transform = transforms.Compose([transforms.Resize((64, 64)), transforms.ToTensor(), 
                                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    else:
+        forward_transform = transforms.Compose([transforms.ToTensor(), 
+                                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     inverse_transform = transforms.Compose([transforms.Normalize((-1, -1, -1), (2, 2, 2)), 
                                             transforms.ToPILImage()])
     

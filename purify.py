@@ -72,6 +72,9 @@ def main(rank, args):
             elif args.dataset == 'stl10':
                 train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.ToTensor())
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+            elif args.dataset == 'stl10_64':
+                train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.Compose([torchvision.transforms.Resize(64),torchvision.transforms.ToTensor()]))
+                train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)
             train_loader = torch.utils.data.DataLoader(ImageListDataset(poison_tuple_list), batch_size=128, shuffle=False, num_workers=4)
@@ -131,7 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_proc', type=int, default=1, help='number of processes for TPU')
 
     ### Experiment Arguments ###
-    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
+    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
 
     ### Purification Arguments ###
 
