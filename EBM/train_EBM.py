@@ -33,14 +33,14 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
 
     if args.poison_Narcissus:
 
-        train_data, poison_indices_all = get_train_data(args.dataset, args.data_dir,True,False,args.poison_Narcissus,args.poison_amount)
+        train_data, poison_indices_all = get_train_data(args.dataset, args.data_dir,args.use_rand_trans,True,args.poison_Narcissus,args.poison_amount)
         if args.verbose: xm.master_print(f'Len poison indices: {len(poison_indices_all)}, num unique: {len(np.unique(poison_indices_all))}')
         # Save poison indices
         if xm.is_master_ordinal():
             torch.save(poison_indices_all,os.path.join(args.output_dir,f'poison_indices.pt'))
     else:
 
-        train_data = get_train_data(args.dataset, args.data_dir,True,False)
+        train_data = get_train_data(args.dataset, args.data_dir,args.use_rand_trans)
 
     test_data = get_test_data(args.dataset, args.data_dir)
 
@@ -144,7 +144,7 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
         grad_norms.append(xm.mesh_reduce('gard_norms',round(float(gard_norms_epoch), 4),np.mean))
 
         # Save checkpoints and final model
-        if (epoch % args.checkpoint_freq == 0 or epoch in [1,5,10,50,args.epochs]):
+        if (epoch % args.checkpoint_freq == 0 or epoch in [1,5,10,args.epochs]):
             
             # Save model
             xm.save(ebm.state_dict(), os.path.join(args.output_dir,f'ebm_epoch_{epoch}.pt'))
@@ -194,6 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4, metavar='N')
     parser.add_argument('--lr_decay_milestones', nargs='+', type=int, default=[40, 75, 100], help='List of epoch indices to decrease learning rate')
     parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='Factor by which learning rate is decreased at each milestone')
+    parser.add_argument('--use_rand_trans', action='store_true',default=False, help='Whether to use random transformations for data augmentation')
     parser.add_argument('--num_workers', type=int, default=0, metavar='N')
     parser.add_argument('--checkpoint_freq', type=int, default=20, metavar='N', help='Number of checkpoints to save during training')
     parser.add_argument('--fid_mcmc_steps', nargs='+', type=int, default=[100,500,1000], help='List of mcmc steps to calculate FID at')

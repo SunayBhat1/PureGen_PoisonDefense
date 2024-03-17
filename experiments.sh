@@ -55,10 +55,11 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18;
 
 
-### Node 8: Train small EBMS
-# python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --v;
-python3 EBM/train_EBM.py --dataset 'cifar10' --v;
+### Node 8: Train small EBMS CINIC-10 
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset';
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --lr 1e-3;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --epochs 100 --lr_decay_milestones 35 65 85; 
+
 
 
 
