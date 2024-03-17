@@ -21,6 +21,20 @@ sns.set_style('darkgrid')
 import os
 from tqdm import tqdm
 
+#############
+# Definitions
+#############
+
+dataset_dict = {'cifar10':{'image_dims': [3, 32, 32], 'num_classes': 10},
+                'cifar10_BP':{'image_dims': [3, 32, 32], 'num_classes': 10},
+                'cifar10_GM':{'image_dims': [3, 32, 32], 'num_classes': 10},
+                'cifar10_45K':{'image_dims': [3, 32, 32], 'num_classes': 10},
+                'cinic10':{'image_dims': [3, 32, 32], 'num_classes': 10},
+                'cincic10_imagenet_subset':{'image_dims': [3, 32, 32], 'num_classes': 10},
+                'mnist':{'image_dims': [1, 28, 28], 'num_classes': 10},
+                'tiny_imagenet':{'image_dims': [3, 64, 64], 'num_classes': 200},
+                'stl10':{'image_dims': [3, 96, 96], 'num_classes': 10}
+                }
 
 #############
 # General Utils

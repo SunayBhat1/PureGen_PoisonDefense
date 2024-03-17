@@ -17,8 +17,8 @@ def create_ebm(net_type, num_filters, num_channels = 3, patch_size=1):
         object: An instance of the created EBM network.
     """
 
-    if net_type == 'EBM_Small':
-        net = EBM(n_c=num_channels)
+    if net_type == 'EBM':
+        net = EBM(n_c=num_channels, n_f=num_filters)
     elif net_type == 'EBMSNGAN32':
         net = EBMSNGAN32(nf=num_filters, patch_size=patch_size) 
     elif net_type == 'EBMSNGAN128':

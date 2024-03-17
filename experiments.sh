@@ -55,8 +55,12 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18;
 
 
-### Node 8: Train STL EBM
-python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
+### Node 8: Train small EBMS
+# python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --v;
+python3 EBM/train_EBM.py --dataset 'cifar10' --v;
+
+
 
 ### Node 9 Train STL R18 Classifier
 python3 run.py --dataset 'stl10'
