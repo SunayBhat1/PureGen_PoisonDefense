@@ -50,7 +50,7 @@ def main(rank, args):
 
     train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device)
 
-    if 'HLB' in args.model:
+    if 'HLB' in args.model and args.dataset in ['cifar10']:
         train_loader = train_data
     else:
         train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,num_workers=4)
@@ -58,7 +58,7 @@ def main(rank, args):
     # Print training data details
     if args.verbose:
         p_count = sum(p.sum().item() for _, _, _, p in train_loader) 
-        if 'HLB' in args.model: print(f'Loaded training data {len(train_loader.images)} samples, {p_count} poisoned or {p_count/len(train_loader.images):.2%} poisoned')
+        if 'HLB' in args.model and args.dataset in ['cifar10']: print(f'Loaded training data {len(train_loader.images)} samples, {p_count} poisoned or {p_count/len(train_loader.images):.2%} poisoned')
         else: print(f'Loaded training data {len(train_loader.dataset)} samples, {p_count} poisoned or {p_count/len(train_loader.dataset):.2%} poisoned')
 
     if args.baseline_defense == 'Friendly':
@@ -77,14 +77,19 @@ def main(rank, args):
     ##########################
         
     if args.poison_mode == 'from_scratch':
-        test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
+        if args.dataset == 'cifar10':
+            test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
+        elif args.dataset == 'cinic10':
+            test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
+        elif args.dataset == 'stl10':
+            test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
     else:
         test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
 
     test_data = get_test_dataset(args, test_transforms)
 
-    if 'HLB' in args.model:
-        test_loader = CifarLoader(test_data, train=False, batch_size=1000)
+    if 'HLB' in args.model and args.dataset in ['cifar10']:
+        test_loader = CifarLoader(test_data, train=False, batch_size=1000,dataset_name=args.dataset)
     else:
         test_loader = torch.utils.data.DataLoader(test_data, batch_size=128,num_workers=4)
 
@@ -96,13 +101,14 @@ def main(rank, args):
             cifar_test_loader = torch.utils.data.DataLoader(cifar_test_data, batch_size=128,num_workers=4)
 
     if not args.no_poison:
-        
         if args.poison_type == 'Narcissus':
             test_trigger_loaders = get_poisons_target(args, target_index, test_transforms, target_mask = target_mask_label)
         else:
             poison_target_image, target_orig_label = get_poisons_target(args, target_index, test_transforms)
 
-    if args.verbose: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.images)}')
+    if args.verbose: 
+        if 'HLB' in args.model and args.dataset in ['cifar10']: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.images)}')
+        else: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.dataset)}')
 
     ##############################
     # Load the target network, optimizer, and loss function
@@ -118,7 +124,10 @@ def main(rank, args):
 
     # Scheduler
     if 'HLB' in args.model:
-        total_train_steps = np.ceil(len(train_data) * args.epochs)
+        if args.dataset == 'cifar10':
+            total_train_steps = np.ceil(len(train_data) * args.epochs)
+        else:
+            total_train_steps = np.ceil(len(train_data) / args.batch_size * args.epochs)
         lr_schedule = np.interp(np.arange(1+total_train_steps),
                             [0, int(0.2 * total_train_steps), total_train_steps],
                             [0.2, 1, 0]) # triangular learning rate schedule
@@ -321,7 +330,7 @@ if __name__ == '__main__':
     ### Experiment Arguments ###
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
     parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
-    parser.add_argument('--model', default='HLB', type=str, choices=['HLB','ResNet18_HLB','ResNet18','MobileNetV2','DenseNet121'],help='type of model to use')
+    parser.add_argument('--model', default='HLB', type=str, choices=['HLB','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
     parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--fine_tune', default=False, action='store_true',help="Whether retrain the full model (fine-tuning) or just the linear layer (default: False)")

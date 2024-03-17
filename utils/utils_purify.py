@@ -82,58 +82,60 @@ def get_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
     
-    try:
-        if args.poison_type == 'Gradient_Matching':
-            poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/Gradient_Matching/{target_index}'))
+    if args.poison_type == 'Gradient_Matching':
+        poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/Gradient_Matching/{target_index}'))
 
-        elif args.poison_type == 'Narcissus':
-            if args.poison_mode == 'from_scratch':
-                if hasattr(args, 'index_list_narcissus'):
-                    index_list = np.load(os.path.join(args.data_dir,'models/ebms',f'{args.index_list_narcissus}'))
-                else:
-                    index_list = None
+    elif args.poison_type == 'Narcissus':
+        if args.poison_mode == 'from_scratch':
+            if hasattr(args, 'index_list_narcissus'):
+                index_list = np.load(os.path.join(args.data_dir,'models/ebms',f'{args.index_list_narcissus}'))
+            else:
+                index_list = None
+            if args.dataset == 'stl10':
+                # Map stl classes to cifar classes
+                stl_cifar_label_map = {0: 0, 1: 2, 2: 1, 3: 3, 4: 4, 5: 5, 6: 7, 7: 6, 8: 8, 9: 9}
+                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
+                                                                                        args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
+            else:
                 poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
-                                                                                            args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
-            elif args.poison_mode == 'transfer':
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
-                                                                                            os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list=None, transfer_subset=True)
-        elif args.poison_type == 'BullseyePolytope':
+                                                                                        args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
+        elif args.poison_mode == 'transfer':
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                                                                                        os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list=None, transfer_subset=True)
+    elif args.poison_type == 'BullseyePolytope':
 
-            inverse_transform = transforms.Compose([transforms.Normalize(mean=[-i/j for i,j in zip(cifar_mean, cifar_std)], std=[1/j for j in cifar_std]),transforms.ToPILImage()])
+        inverse_transform = transforms.Compose([transforms.Normalize(mean=[-i/j for i,j in zip(cifar_mean, cifar_std)], std=[1/j for j in cifar_std]),transforms.ToPILImage()])
 
-            # Path Adjustments for Bullseye Polytope Settings
-            if args.fine_tune: bp_subpath = 'end2end-training'
-            else: bp_subpath = 'linear-transfer-learning'
+        # Path Adjustments for Bullseye Polytope Settings
+        if args.fine_tune: bp_subpath = 'end2end-training'
+        else: bp_subpath = 'linear-transfer-learning'
 
-            if args.num_images_bp == 5: bp_subpath = os.path.join(bp_subpath, f'mean-{args.net_repeat_bp}Repeat')
-            else: bp_subpath = os.path.join(bp_subpath, f'mean')
+        if args.num_images_bp == 5: bp_subpath = os.path.join(bp_subpath, f'mean-{args.net_repeat_bp}Repeat')
+        else: bp_subpath = os.path.join(bp_subpath, f'mean')
 
-            # Load the poison
-            bp_poison = torch.load(os.path.join(args.data_dir, \
-                            f'Poisons/Bullseye_Polytope/attack-results-{args.num_images_bp}poisons/100-overlap/{bp_subpath}/{args.iters_bp}/{target_index}/poison_{args.iters_bp-1:05d}.pth'),map_location=torch.device('cpu'))
+        # Load the poison
+        bp_poison = torch.load(os.path.join(args.data_dir, \
+                        f'Poisons/Bullseye_Polytope/attack-results-{args.num_images_bp}poisons/100-overlap/{bp_subpath}/{args.iters_bp}/{target_index}/poison_{args.iters_bp-1:05d}.pth'),map_location=torch.device('cpu'))
+        
+        poison_tuple_list, poison_indices = bp_poison['poison'], bp_poison['idx']
+
+        # Unnormalize the poisons
+        for i in range(len(poison_tuple_list)):
+            poison_tuple_list[i] = (inverse_transform(poison_tuple_list[i][0]), poison_tuple_list[i][1])
+
+        target = 8
+
+    elif args.poison_type == 'BullseyePolytope_Bench':
             
-            poison_tuple_list, poison_indices = bp_poison['poison'], bp_poison['idx']
+        # Load the poison
+        with open(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'poisons.pickle'), "rb") as handle: 
+            poison_tuple_list = pickle.load(handle)
+        with open(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'base_indices.pickle'), "rb") as handle: 
+            poison_indices = pickle.load(handle)
 
-            # Unnormalize the poisons
-            for i in range(len(poison_tuple_list)):
-                poison_tuple_list[i] = (inverse_transform(poison_tuple_list[i][0]), poison_tuple_list[i][1])
+        target = poison_tuple_list[0][1]
 
-            target = 8
-
-        elif args.poison_type == 'BullseyePolytope_Bench':
-                
-            # Load the poison
-            with open(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'poisons.pickle'), "rb") as handle: 
-                poison_tuple_list = pickle.load(handle)
-            with open(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'base_indices.pickle'), "rb") as handle: 
-                poison_indices = pickle.load(handle)
-
-            target = poison_tuple_list[0][1]
-
-        return poison_tuple_list, poison_indices, target
-    
-    except Exception as e:
-        return None, None, e
+    return poison_tuple_list, poison_indices, target
 
 
 def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison_amount, last_n=True, index_list=None, transfer_subset=False):
@@ -162,15 +164,23 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
     else:
         if dataset == 'cifar10':
             base_dataset = torchvision.datasets.CIFAR10(root=data_dir, train=True, download=(not os.path.exists(os.path.join(data_dir, 'cifar-10-batches-py'))))
+            train_labels = np.array(base_dataset.targets)
         elif dataset == 'cinic10':
             base_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'CINIC-10/valid'))
-        train_labels = np.array(base_dataset.targets)
-
+            train_labels = np.array(base_dataset.targets)
+        elif dataset == 'stl10':
+            base_dataset = torchvision.datasets.STL10(root=data_dir, split='train', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
+            train_labels = np.array(base_dataset.labels)
+        
     noise_npy = np.load(poisons_path)
     best_noise = torch.from_numpy(noise_npy)
+
+    # If the dataset is STL-10, resize the poison patches to 96x96
+    if dataset == 'stl10':
+        best_noise = F.interpolate(best_noise, size=(96, 96), mode='bilinear', align_corners=False)
     
     train_target_list = np.where(train_labels == label)[0]
-
+    
     if last_n:
         # print(f"Poisoning last {poison_amount} images")
         train_target_list = train_target_list[-poison_amount:]

@@ -66,8 +66,12 @@ def main(rank, args):
 
         ### Get Data to Purify ###
         if args.poison_type is None:
-            train_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=True, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=torchvision.transforms.ToTensor())
-            train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+            if args.dataset == 'cifar10':
+                train_data = torchvision.datasets.CIFAR10(root=args.data_dir, train=True, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=torchvision.transforms.ToTensor())
+                train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+            elif args.dataset == 'stl10':
+                train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.ToTensor())
+                train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)
             train_loader = torch.utils.data.DataLoader(ImageListDataset(poison_tuple_list), batch_size=128, shuffle=False, num_workers=4)
@@ -109,39 +113,6 @@ def main(rank, args):
     xm.rendezvous('training end!')
 
 
-##################
-# Helper Functions
-##################
-
-def int_or_int_list(s):
-    if ',' in s:
-        try:
-            return [int(item) for item in s.split(',')]
-        except ValueError:
-            return int(s)
-    else:
-        return int(s)
-    
-def float_or_float_list(s):
-    if ',' in s:
-        try:
-            return [float(item) for item in s.split(',')]
-        except ValueError:
-            return float(s)
-    else:
-        return float(s)
-
-def str_or_str_list(s):
-    if ',' in s:
-        return s.split(',')
-    else:
-        return s
-
-def none_or_str(value):
-    if value == 'None':
-        return None
-    return value
-
 ### Initializer ###
 if __name__ == '__main__':
     
@@ -168,7 +139,7 @@ if __name__ == '__main__':
 
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
-    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'EBM_Small','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
+    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'SuperLightEBM','LightEBM','EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
     args_ebm.add_argument('--ebm_name', default='ebm_cifar10_45k', type=str_or_str_list, help='path to the EBM model including train dataset')
     args_ebm.add_argument('--ebm_nf', default=128, type=int_or_int_list,  help='number of filters for the ebm model')
     args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')

@@ -2,63 +2,34 @@
 # Nodes Lists #
 ###############
 
-### Node1_Base (Dev)
-### Node10 (Dev)
-### Node1
-### Node2
-### Node3
-### Node4
-### Node5
-### Node6
-### Node7
-### Node8
-### Node9
-
 ### Node1 Base: Testing HLB Integrations
 
-
-# Clean HLB Runs
-python3 train_classifier.py --remote_user 'sunaybhat' --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1;
-
-# Poisoned HLB Runs Baseline
-(
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
-
-python3 train_classifier.py --remote_user 'sunaybhat';
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB;
-
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
-
-python3 train_classifier.py --remote_user 'sunaybhat' --noise_eps_narcissus 16;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED --noise_eps_narcissus 16;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --noise_eps_narcissus 16;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --noise_eps_narcissus 16;
-)
-
-# ResNet18 Testing
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1 --dataset 'stl10';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
 
 
-### Node 8: Train STL EBM
-python3 EBM_Training/train_EBM.py --dataset 'stl10' --image_dims 3 96 96 --num_filters 256;
+## STL 10
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --poison_type 'Narcissus';
 
-### Node 9 Train STL R18 Classifier
-python3 run.py --dataset 'stl10'
+
+
+
+### Node 8: Train small EBMS CINIC-10 
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48;
+
+### Node 7: Train small EBMS CINIC-10 
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'; 
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64;
 
 ####################
 # Purificatiion #
 ####################
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
-
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --dataset 'stl10' --num_images_narcissus 100;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --dataset 'stl10' --num_images_narcissus 100;
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None;
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None --poison_type 'Narcissus';
@@ -85,7 +56,10 @@ python3 purify.py --remote_user 'sunaybhat';
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/Research/data_EBM_Defense/* sunaybhat@node1_Base:/home/sunaybhat/data/
 
 # Copy EBM Data down to local
-rsync -av "sunaybhat@node6:/home/sunaybhat/models/ebms/*" /Users/sunaybhat/Documents/GitHub/models/ebm/
+rsync -av "sunaybhat@node7:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
+rsync -av "sunaybhat@node8:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
+rsync -av "sunaybhat@node9:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
+
 
 # Copy Cifar10 Split Data
 scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth sunaybhat@Calt3_dani:/home/sunaybhat/data/;

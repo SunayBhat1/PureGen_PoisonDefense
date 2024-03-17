@@ -16,12 +16,24 @@ import random
 try: import torch_xla.core.xla_model as xm
 except: pass
 
+from clf_models import load_model
+
 # Normalization
 cifar_mean = (0.4914, 0.4822, 0.4465)
 cifar_std = (0.2023, 0.1994, 0.2010)
 
 cifar_mean_gm = (0.4914, 0.4822, 0.4465)
 cifar_std_gm = (0.2471, 0.2435, 0.2616)
+
+stl10_mean = (0.4914, 0.4822, 0.4465)
+stl10_std = (0.2471, 0.2435, 0.2616)
+
+# Dataset info dict
+dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
+                'cinic10':{'num_classes':10,'img_dim':32},
+                'tiny_imagenet':{'num_classes':200,'img_dim':64},
+                'stl10':{'num_classes':10,'img_dim':96},
+                }
 
 # dataset_info dict
 dataset_info = {'from_scratch':{
@@ -34,7 +46,7 @@ dataset_info = {'from_scratch':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 200},
                     },
                 }
-        
+
 
 ####################
 # Train Data Utils #
@@ -104,11 +116,11 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
     train_data = PoisonedDataset(base_loader, poisoned = not args.no_poison, transform=train_transforms)
 
-    if 'HLB' in args.model:
+    if 'HLB' in args.model and args.dataset == 'cifar10':
         aug = {'flip': args.hlb_flip}
         if args.hlb_translate is not None: aug['translate'] = args.hlb_translate
         if args.hlb_cutout is not None: aug['cutout'] = args.hlb_cutout
-        train_data = CifarLoader(train_data.data, train=True, batch_size=args.batch_size, aug=aug, device=device)
+        train_data = CifarLoader(train_data.data, train=True, batch_size=args.batch_size, aug=aug, device=device,dataset_name=args.dataset)
 
     return train_data, target_mask_label
 
@@ -294,7 +306,7 @@ class PoisonedDataset_Bench(data.Dataset):
 
 class CifarLoader:
 
-    def __init__(self, dataset, train=True, batch_size=500, aug=None, drop_last=None, shuffle=None, device=0):
+    def __init__(self, dataset, train=True, batch_size=500, aug=None, drop_last=None, shuffle=None, device=0,dataset_name='cifar10'):
 
         if train:
             self.images, self.labels, self.indices, self.p_values = zip(*dataset)
@@ -306,17 +318,35 @@ class CifarLoader:
             self.p_values = torch.tensor(self.p_values)
         else:
             self.images = torch.tensor(dataset.data)
-            self.labels = torch.tensor(dataset.targets)
+            if dataset_name in ['cifar10','cinic10']:
+                self.labels = torch.tensor(dataset.targets)
+            elif dataset_name == 'stl10':
+                self.labels = torch.tensor(dataset.labels)
+            else:
+                raise Exception(f"Dataset {dataset_name} not supported for HLB Loader")
 
 
         # It's faster to load+process uint8 data than to load preprocessed fp16 data
         self.images = (self.images / 255).permute(0, 3, 1, 2).to(memory_format=torch.channels_last)
 
-        self.normalize = transforms.Normalize(cifar_mean, cifar_std)
-        self.denormalize = transforms.Normalize(
-                                tuple(-mean / std for mean, std in zip(cifar_mean, cifar_std)), 
-                                tuple(1 / std for std in cifar_std)
-                            )
+        if dataset_name == 'cifar10':
+            self.normalize = transforms.Normalize(cifar_mean, cifar_std)
+            self.denormalize = transforms.Normalize(
+                                    tuple(-mean / std for mean, std in zip(cifar_mean, cifar_std)), 
+                                    tuple(1 / std for std in cifar_std)
+                                )
+        elif dataset_name == 'cinic10':
+            self.normalize = transforms.Normalize(cifar_mean, cifar_std)
+            self.denormalize = transforms.Normalize(
+                                    tuple(-mean / std for mean, std in zip(cifar_mean, cifar_std)), 
+                                    tuple(1 / std for std in cifar_std)
+                                )
+        elif dataset_name == 'stl10':
+            self.normalize = transforms.Normalize(stl10_mean, stl10_std)
+            self.denormalize = transforms.Normalize(
+                                    tuple(-mean / std for mean, std in zip(stl10_mean, stl10_std)), 
+                                    tuple(1 / std for std in stl10_std)
+                                )
         
         self.aug = aug or {}
         for k in self.aug.keys():
@@ -489,9 +519,20 @@ def batch_cutout(inputs, size):
     
 def get_train_transforms(args):
     if args.poison_mode == 'from_scratch' or args.poison_type in ['BullseyePolytope_Bench','Narcissus']:
-        train_transforms = [transforms.RandomCrop(32, padding=4),
-                                            transforms.RandomHorizontalFlip(),
-                                            transforms.ToTensor()]
+        if args.dataset in ['cifar10','cinic10']:
+            train_transforms = [transforms.RandomCrop(32, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        elif args.dataset == 'stl10':
+            train_transforms = [transforms.RandomCrop(96, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        elif args.dataset == 'tiny-imagenet':
+            train_transforms = [transforms.RandomCrop(64, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        else:
+            raise Exception(f"Dataset {args.dataset} transforms not supported for from_scratch poison mode")
     elif args.poison_mode == 'transfer' and args.poison_type == 'BullseyePolytope':
         train_transforms = [transforms.ToTensor()]
 
@@ -513,7 +554,12 @@ def get_train_transforms(args):
             train_transforms.append(BernoulliNoise(eps=args.friendly_noise_eps / 255))
 
     if args.poison_mode == 'from_scratch':
-        train_transforms.append(transforms.Normalize(cifar_mean_gm, cifar_std_gm))
+        if args.dataset == 'cifar10':
+            train_transforms.append(transforms.Normalize(cifar_mean_gm, cifar_std_gm))
+        elif args.dataset == 'cinic10':
+            train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
+        elif args.dataset == 'stl10':
+            train_transforms.append(transforms.Normalize(stl10_mean, stl10_std))
     elif args.poison_mode == 'transfer':
         train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
 
@@ -619,6 +665,136 @@ class RandomTransform(torch.nn.Module):
         # Sample using grid sample
         return torch.squeeze(F.grid_sample(x, grid_shifted, align_corners=self.align, mode=self.mode))
 
+
+#############
+# Model Utils
+#############
+
+
+def load_target_network(args,device):
+
+    num_classes = dataset_dict[args.dataset]['num_classes']
+    img_dim = dataset_dict[args.dataset]['img_dim']
+
+    if args.poison_mode == 'from_scratch' or args.fine_tune:
+        target_net = load_model(args.model,hlb_type=args.hlb_type, num_classes=num_classes, img_size=img_dim)
+    elif args.poison_type == 'BullseyePolytope':
+        target_net = load_model(args.model, eval_bn=True)
+    elif args.poison_type == 'BullseyePolytope_Bench':
+        target_net = load_model(args.model, num_classes=100, eval_bn=True)
+    else:
+        target_net = load_model(args.model)
+
+    # Load state dict for transfer learning
+    if args.poison_mode == 'transfer':
+            
+        # Use benchmark if running BullseyePolytope_Bench
+        if args.poison_type == 'BullseyePolytope_Bench':
+            model_path = 'ResNet18_CIFAR100.pth'
+        else:
+            model_path = args.model_path
+
+        state_dict_path = os.path.join(args.data_dir,'models', 'transfer_models', model_path)
+        state_dict_module = torch.load(state_dict_path,map_location=torch.device('cpu'))['net']
+        state_dict = {}
+        for k,v in state_dict_module.items():
+            state_dict[k.replace('module.', '')] = v
+        target_net.load_state_dict(state_dict)
+
+        if args.verbose: print(f'Loaded the target network from {state_dict_path}')
+
+    # Move target_net to device
+    if 'HLB' in args.model:
+        target_net = target_net.to(device).to(memory_format=torch.channels_last)
+    else:
+        target_net = target_net.to(device)
+
+    # Reinit Linear layer for transfer learning
+    if args.poison_mode == 'transfer' and args.reinit_linear:
+        if args.model == 'ResNet18':
+            target_net.linear = nn.Linear(512, 10).to(device)
+        elif args.model == 'DenseNet121':
+            target_net.linear = nn.Linear(1024, 10).to(device)
+        elif args.model == 'MobileNetV2':
+            target_net.linear = nn.Linear(1280, 10).to(device)
+        if args.verbose: print(f'Reinitialized the linear layer of the target network')
+
+    return target_net
+
+def get_optimizer(args,target_net):
+
+    if args.poison_mode == 'from_scratch':
+
+        if args.model == 'ResNet18_HLB':
+            optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
+                                weight_decay=args.weight_decay*args.batch_size)
+            
+            return optimizer
+        
+        elif args.model == 'HLB':
+            kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
+            lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
+            wd = args.weight_decay * args.batch_size / kilostep_scale
+            lr_biases = lr * args.bias_scaler
+
+            norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
+            other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
+            param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
+                            dict(params=other_params, lr=lr, weight_decay=wd/lr)]
+            optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)    
+            
+        elif args.optim == 'adam':
+            optimizer = torch.optim.Adam(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+
+        elif args.optim == 'sgd_gm':
+            no_decay = ['bias', 'bn']
+            grouped_parameters = [
+                {'params': [p for n, p in target_net.named_parameters() if not any(
+                    nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+                {'params': [p for n, p in target_net.named_parameters() if any(
+                    nd in n for nd in no_decay)], 'weight_decay': 0.0}
+            ]
+            optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
+
+        elif args.optim == 'sgd':
+            optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
+        elif args.optim == 'smd':
+            no_decay = ['bias', 'bn']
+            grouped_parameters = [
+                {'params': [p for n, p in target_net.named_parameters() if not any(
+                    nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
+                {'params': [p for n, p in target_net.named_parameters() if any(
+                    nd in n for nd in no_decay)], 'weight_decay': 0.0}
+            ]
+            optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True,q=1.5)
+        elif  args.optim == 'adamwq':
+            # optimizer = AdamWq(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay,q=1.25)
+            lr_biases = 9e-3 * 128
+            norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
+            other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
+            param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=5e-4),
+                            dict(params=other_params, lr=9e-3, weight_decay=5e-4)]            
+            # optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
+            # optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, q=1.5, momentum=args.momentum, nesterov=True)
+            optimizer = AdamWq(param_configs, betas=(0.9,0.999),q=1.5,eps=5e-7)
+            # optimizer = XMatP(target_net.parameters(), lr_params=2e-2, preconditioner_init_scale=None,
+            #                   grad_clip_max_norm=100,momentum=0.9,regularization=1.5,preconditioner_update_probability=0.1)            
+            
+    elif args.poison_mode == 'transfer':
+
+        if args.fine_tune:
+            params = target_net.parameters()
+        else:
+            params = target_net.get_penultimate_params_list()
+
+        if args.optim == 'adam':
+            optimizer = torch.optim.Adam(params, lr=args.lr, weight_decay=args.weight_decay)
+        elif args.optim == 'sgd':
+            optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
+    return optimizer
+
 #############
 # Poison Utils
 #############
@@ -680,9 +856,19 @@ def get_target_narcissus(data_dir, dataset, poison, label, transform_test, multi
     best_noise = torch.from_numpy(poison)
     if dataset == 'cifar10':
         test_dataset = torchvision.datasets.CIFAR10(root=data_dir, train=False, download=(not os.path.exists(os.path.join(data_dir, 'cifar-10-batches-py'))))
+        test_labels = np.array(test_dataset.targets)
     elif dataset == 'cinic10':
         test_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'CINIC-10/test'))
-    test_labels = np.array(test_dataset.targets)
+        test_labels = np.array(test_dataset.targets)
+    elif dataset == 'tiny-imagenet':
+        test_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'tiny-imagenet-200/test'))
+        test_labels = np.array(test_dataset.targets)
+    elif dataset == 'stl10':
+        test_dataset = torchvision.datasets.STL10(root=data_dir, split='test', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
+        test_labels = np.array(test_dataset.labels)
+    else:
+        raise Exception(f"Dataset {dataset} not supported for Narcissus poison mode Test Data")
+    
     test_target_list = np.where(test_labels != label)[0]
     return Trigger_Test_Dataset(test_dataset, test_target_list, best_noise * multi_test, label, transform=transform_test, clean=clean)
 
