@@ -17,8 +17,8 @@ python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLigh
 python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48 --lr 1e-5;
 
 ### Node 7: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'; 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --lr 1e-5;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64 --lr 1e-5;
 
 ####################
 # Purificatiion #
