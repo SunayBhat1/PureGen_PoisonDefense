@@ -48,7 +48,8 @@ python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset';
 python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --lr 1e-3;
 
 ### Node 7: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --epochs 100 --lr_decay_milestones 35 65 85; 
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'; 
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64;
 
 ####################
 # Purificatiion #

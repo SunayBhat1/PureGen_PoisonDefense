@@ -172,7 +172,7 @@ if __name__ == '__main__':
 
     # EBM Type and Dataset
     parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',choices=['stl10','cifar10','cinic10','cifar10_BP','cifar10_GM','cifar10_45K','cinic10','mnist','cincic10_imagenet_subset'], help='Dataset to train on')
-    parser.add_argument('--model', type=str, default='EBM', metavar='N',choices=['EBM', 'EBMSNGAN32', 'EBMSNGAN128', 'EBMSNGAN256'])
+    parser.add_argument('--model', type=str, default='EBM', metavar='N',choices=['SuperLightEBM','LightEBM','EBM', 'EBMSNGAN32', 'EBMSNGAN128', 'EBMSNGAN256'])
     parser.add_argument('--num_filters', type=int, default=32, metavar='N')
     parser.add_argument('--seed', type=int, default=11, metavar='N')
 
