@@ -55,7 +55,7 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
     # Creates dataloaders, which load data in batches
     train_loader = DataLoader(train_data,batch_size=args.batch_size,sampler=train_sampler,num_workers=args.num_workers,drop_last=True)
     bank_loader = DataLoader(train_data,batch_size=args.batch_size,sampler=bank_sampler,num_workers=args.num_workers,drop_last=True)
-    fid_loader = DataLoader(test_data,batch_size=args.batch_size,sampler=fid_sampler,num_workers=args.num_workers,drop_last=True)
+    fid_loader = DataLoader(test_data,batch_size=16,sampler=fid_sampler,num_workers=args.num_workers,drop_last=True)
 
     # Create persistent image bank
     image_bank = initialize_persistent(args.image_dims, args.persistent_size, bank_loader, args.data_epsilon, device, poisoned = args.poison_Narcissus)
