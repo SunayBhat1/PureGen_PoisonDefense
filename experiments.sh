@@ -8,44 +8,16 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB 
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
 
 
-# Clean HLB Runs
-python3 train_classifier.py --remote_user 'sunaybhat' --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1;
-
-# Poisoned HLB Runs Baseline
-(
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
-
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key 
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB;
-
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
-
-python3 train_classifier.py --remote_user 'sunaybhat' --noise_eps_narcissus 16;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_MED --noise_eps_narcissus 16;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --noise_eps_narcissus 16;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --noise_eps_narcissus 16;
-)
-
 ## STL 10
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --poison_type 'Narcissus';
 
 
-# ResNet18 Testing
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18;
 
 
 ### Node 8: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset';
-
-### Node 9: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --lr 1e-3;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48;
 
 ### Node 7: Train small EBMS CINIC-10 
 python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'; 
