@@ -11,8 +11,8 @@ import torch_xla.distributed.parallel_loader as pl
 import torch_xla.distributed.xla_multiprocessing as xmp
 from torchvision import datasets, transforms
 
-from EBMs import create_ebm
-from utils_ebm_train import *
+from EBM_models import create_ebm
+from utils_train import *
 
 def _map_train_EBM(index,args, WRAPPED_MODEL):
 
@@ -33,14 +33,14 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
 
     if args.poison_Narcissus:
 
-        train_data, poison_indices_all = get_train_data(args.dataset, args.data_dir,True,False,args.poison_Narcissus,args.poison_amount)
+        train_data, poison_indices_all = get_train_data(args.dataset, args.data_dir,args.use_rand_trans,True,args.poison_Narcissus,args.poison_amount)
         if args.verbose: xm.master_print(f'Len poison indices: {len(poison_indices_all)}, num unique: {len(np.unique(poison_indices_all))}')
         # Save poison indices
         if xm.is_master_ordinal():
             torch.save(poison_indices_all,os.path.join(args.output_dir,f'poison_indices.pt'))
-    
     else:
-        train_data = get_train_data(args.dataset, args.data_dir,True,False)
+
+        train_data = get_train_data(args.dataset, args.data_dir,args.use_rand_trans)
 
     test_data = get_test_data(args.dataset, args.data_dir)
 
@@ -55,7 +55,7 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
     # Creates dataloaders, which load data in batches
     train_loader = DataLoader(train_data,batch_size=args.batch_size,sampler=train_sampler,num_workers=args.num_workers,drop_last=True)
     bank_loader = DataLoader(train_data,batch_size=args.batch_size,sampler=bank_sampler,num_workers=args.num_workers,drop_last=True)
-    fid_loader = DataLoader(test_data,batch_size=args.batch_size,sampler=fid_sampler,num_workers=args.num_workers,drop_last=True)
+    fid_loader = DataLoader(test_data,batch_size=16,sampler=fid_sampler,num_workers=args.num_workers,drop_last=True)
 
     # Create persistent image bank
     image_bank = initialize_persistent(args.image_dims, args.persistent_size, bank_loader, args.data_epsilon, device, poisoned = args.poison_Narcissus)
@@ -144,7 +144,7 @@ def _map_train_EBM(index,args, WRAPPED_MODEL):
         grad_norms.append(xm.mesh_reduce('gard_norms',round(float(gard_norms_epoch), 4),np.mean))
 
         # Save checkpoints and final model
-        if (epoch % args.checkpoint_freq == 0 or epoch in [1,5,10,50,args.epochs]):
+        if (epoch % args.checkpoint_freq == 0 or epoch in [1,5,10,args.epochs]):
             
             # Save model
             xm.save(ebm.state_dict(), os.path.join(args.output_dir,f'ebm_epoch_{epoch}.pt'))
@@ -172,14 +172,13 @@ if __name__ == '__main__':
 
     # EBM Type and Dataset
     parser.add_argument('--dataset', type=str, default='cifar10', metavar='N',choices=['stl10','cifar10','cinic10','cifar10_BP','cifar10_GM','cifar10_45K','cinic10','mnist','cincic10_imagenet_subset'], help='Dataset to train on')
-    parser.add_argument('--image_dims', default=[3,32,32], nargs='+', type=int, metavar='N')
-    parser.add_argument('--ebm', type=str, default='EBMSNGAN32', metavar='N',choices=['EBM_Small', 'EBMSNGAN32', 'EBMSNGAN128', 'EBMSNGAN256'])
-    parser.add_argument('--num_filters', type=int, default=128, metavar='N')
+    parser.add_argument('--model', type=str, default='EBM', metavar='N',choices=['SuperLightEBM','LightEBM','EBM', 'EBMSNGAN32', 'EBMSNGAN128', 'EBMSNGAN256'])
+    parser.add_argument('--num_filters', type=int, default=32, metavar='N')
     parser.add_argument('--seed', type=int, default=11, metavar='N')
 
     # Data poisoning
     parser.add_argument('--poison_Narcissus', action='store_true',default=False, help='Whether to poison the Narcissus dataset')
-    parser.add_argument('--poison_amount', type=int, default=500, metavar='N', help='Number of images to poison (per call, 5k max)')
+    parser.add_argument('--poison_amount', type=int, default=500, metavar='N', help='Number of images to poison (per class, 5k max)')
 
     # Langevin dynamics and EBM training
     parser.add_argument('--mcmc_steps', type=int, default=100, metavar='N')
@@ -190,18 +189,19 @@ if __name__ == '__main__':
     parser.add_argument('--rejuv_prob', type=float, default=0.05, metavar='N', help='probability of rejuvenating persistent samples')
 
     # General training
-    parser.add_argument('--epochs', type=int, default=780, metavar='N')
+    parser.add_argument('--epochs', type=int, default=120, metavar='N')
     parser.add_argument('--batch_size', type=int, default=16, metavar='N')
     parser.add_argument('--lr', type=float, default=1e-4, metavar='N')
-    parser.add_argument('--lr_decay_milestones', nargs='+', type=int, default=[0, 234, 468], help='List of epoch indices to decrease learning rate')
+    parser.add_argument('--lr_decay_milestones', nargs='+', type=int, default=[40, 75, 100], help='List of epoch indices to decrease learning rate')
     parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='Factor by which learning rate is decreased at each milestone')
+    parser.add_argument('--use_rand_trans', action='store_true',default=False, help='Whether to use random transformations for data augmentation')
     parser.add_argument('--num_workers', type=int, default=0, metavar='N')
-    parser.add_argument('--checkpoint_freq', type=int, default=65, metavar='N', help='Number of checkpoints to save during training')
-    parser.add_argument('--fid_mcmc_steps', nargs='+', type=int, default=[100,500], help='List of mcmc steps to calculate FID at')
+    parser.add_argument('--checkpoint_freq', type=int, default=20, metavar='N', help='Number of checkpoints to save during training')
+    parser.add_argument('--fid_mcmc_steps', nargs='+', type=int, default=[100,500,1000], help='List of mcmc steps to calculate FID at')
 
     # Other training options
     parser.add_argument('--data_dir', type=str, default='/home/sunaybhat/data', metavar='N')
-    parser.add_argument('--output_dir', type=str, default='/home/sunaybhat/models/ebms', metavar='N')
+    parser.add_argument('--output_dir', type=str, default='/home/sunaybhat/models', metavar='N')
     parser.add_argument('--verbose','--v', action='store_true')
 
     args = parser.parse_args()
@@ -219,9 +219,9 @@ if __name__ == '__main__':
 
     # Create Output Directory (add timestamp)
     if not args.poison_Narcissus:
-        args.output_dir = os.path.join(args.output_dir,f'{args.dataset}',time.strftime("%Y_%m_%d_%H_%M", time.localtime()))
+        args.output_dir = os.path.join(args.output_dir,f'{args.model}',f'{args.dataset}',time.strftime("%Y_%m_%d_%H_%M", time.localtime()))
     else:
-        args.output_dir = os.path.join(args.output_dir,f'{args.dataset}_Narcissus_{args.poison_amount}',time.strftime("%Y_%m_%d_%H_%M", time.localtime()))
+        args.output_dir = os.path.join(args.output_dir,f'{args.model}',f'{args.dataset}_NS_{args.poison_amount}',time.strftime("%Y_%m_%d_%H_%M", time.localtime()))
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
@@ -234,13 +234,15 @@ if __name__ == '__main__':
         for arg in vars(args):
             f.write(f'{arg}: {getattr(args, arg)}\n')
 
+    # Get dataset info
+    args.image_dims = dataset_dict[args.dataset]['image_dims']
+
     # Create EBM
-    ebm = create_ebm(args.ebm,args.image_dims,args.num_filters)
-    # ebm.load_state_dict(torch.load('/home/sunaybhat/models/ebms/cifar10_EBMSNGAN32/2023_12_07_15_21/ebm_epoch_195.pt'))
+    ebm = create_ebm(args.model,num_filters=args.num_filters,num_channels=args.image_dims[0])
     WRAPPED_MODEL = xmp.MpModelWrapper(ebm)
 
     if args.verbose:
-        print(f'Using {args.ebm} on {args.dataset}, Number of parameters: {sum(p.numel() for p in ebm.parameters())}')
+        print(f'Using {args.model} on {args.dataset}, Number of parameters: {sum(p.numel() for p in ebm.parameters())}')
 
     start_time = time.time()
     xmp.spawn(_map_train_EBM, args=(args, WRAPPED_MODEL), nprocs=8, start_method='fork')

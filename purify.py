@@ -46,9 +46,9 @@ def main(rank, args):
         purify_pbar = False
 
     # Get diff and ebm model paths
-    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.dataset,args.ebm_name+'.pt')
+    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.ebm_name+'.pt')
     else: ebm_path = None
-    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.dataset,args.diff_name+'.pt')
+    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.diff_name+'.pt')
     else: diff_path = None
 
     # Create the PureDefense object
@@ -142,7 +142,7 @@ if __name__ == '__main__':
 
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
-    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'EBM_Small','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
+    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'SuperLightEBM','LightEBM','EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
     args_ebm.add_argument('--ebm_name', default='ebm_cifar10_45k', type=str_or_str_list, help='path to the EBM model including train dataset')
     args_ebm.add_argument('--ebm_nf', default=128, type=int_or_int_list,  help='number of filters for the ebm model')
     args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')
