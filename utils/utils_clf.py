@@ -32,7 +32,8 @@ stl10_std = (0.2471, 0.2435, 0.2616)
 dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
                 'cinic10':{'num_classes':10,'img_dim':32},
                 'tiny_imagenet':{'num_classes':200,'img_dim':64},
-                'stl10':{'num_classes':10,'img_dim':64},
+                'stl10':{'num_classes':10,'img_dim':96},
+                'stl10_64':{'num_classes':10,'img_dim':64},
                 }
 
 # dataset_info dict
@@ -41,6 +42,7 @@ dataset_info = {'from_scratch':{
                     'cinic10': {'num_classes': 10, 'num_per_label': 9000},
                     'tiny-imagenet': {'num_classes': 200, 'num_per_label': 500},
                     'stl10': {'num_classes': 10, 'num_per_label': 500},
+                    'stl10_64': {'num_classes': 10, 'num_per_label': 500},
                     },
                 'transfer':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 200},
@@ -407,6 +409,10 @@ def get_test_dataset(args, transform):
         test_data = ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/test'), transform=transform)
     elif args.dataset == 'stl10':
         test_data = STL10(args.data_dir, split='test', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transform)
+    elif args.dataset == 'stl10_64':
+        test_data = STL10(args.data_dir, split='test', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transform)
+    else:
+        raise Exception(f"Dataset {args.dataset} not supported in function get_test_dataset")
 
     return test_data
 
@@ -524,6 +530,10 @@ def get_train_transforms(args):
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
         elif args.dataset == 'stl10':
+            train_transforms = [transforms.RandomCrop(96, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        elif args.dataset == 'stl10_64':
             train_transforms = [transforms.RandomCrop(64, padding=4),
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
@@ -558,7 +568,7 @@ def get_train_transforms(args):
             train_transforms.append(transforms.Normalize(cifar_mean_gm, cifar_std_gm))
         elif args.dataset == 'cinic10':
             train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
-        elif args.dataset == 'stl10':
+        elif args.dataset in ['stl10','stl10_64']:
             train_transforms.append(transforms.Normalize(stl10_mean, stl10_std))
     elif args.poison_mode == 'transfer':
         train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
@@ -863,7 +873,7 @@ def get_target_narcissus(data_dir, dataset, poison, label, transform_test, multi
     elif dataset == 'tiny-imagenet':
         test_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'tiny-imagenet-200/test'))
         test_labels = np.array(test_dataset.targets)
-    elif dataset == 'stl10':
+    elif dataset in ['stl10','stl10_64']:
         test_dataset = torchvision.datasets.STL10(root=data_dir, split='test', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
         test_labels = np.array(test_dataset.labels)
     else:

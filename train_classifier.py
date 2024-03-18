@@ -83,6 +83,8 @@ def main(rank, args):
             test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
         elif args.dataset == 'stl10':
             test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
+        elif args.dataset == 'stl10_64':
+            test_transforms = transforms.Compose([transforms.Resize((64,64)),transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
     else:
         test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
 
@@ -328,7 +330,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
 
     ### Experiment Arguments ###
-    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
+    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
     parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
     parser.add_argument('--model', default='HLB', type=str, choices=['HLB','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
