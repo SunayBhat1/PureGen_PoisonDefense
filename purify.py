@@ -46,7 +46,7 @@ def main(rank, args):
         purify_pbar = False
 
     # Get diff and ebm model paths
-    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.dataset,args.ebm_name+'.pt')
+    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.ebm_name+'.pt')
     else: ebm_path = None
     if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.dataset,args.diff_name+'.pt')
     else: diff_path = None
@@ -63,6 +63,9 @@ def main(rank, args):
         pbar = tqdm(total=target_indices, desc='Purifying Poisoned Data')
     
     for i,args.target_index in enumerate(range(target_indices)):
+        # Save the time that each target index takes to purify.
+        if args.save_time:
+            start_time = time.time()
 
         ### Get Data to Purify ###
         if args.poison_type is None:
@@ -81,7 +84,15 @@ def main(rank, args):
                         diff_steps=args.diff_purify_steps, diff_eta=args.diff_eta,
                         purify_reps=1,pbar=purify_pbar)
         
-
+        # Save time
+        if args.save_time:
+            end_time = time.time()
+            data_key=''
+            with open(os.path.join(args.data_dir,'PureDefense',args.dataset,'purify_time.txt'),'a') as f:
+                if args.poison_type is not None:
+                    data_key += f'{args.poison_type}_{args.noise_eps_narcissus}_'
+                data_key += f'{args.ebm_model}[{args.ebm_name}_nf{args.ebm_nf}]_{args.ebm_lang_steps}Steps_T{args.ebm_lang_temp}'
+                f.write(f'{data_key}, Target Index {args.target_index}: {end_time-start_time}\n')
         ### Save the purified data ###
         data_key = ''
         if args.ebm_lang_steps > 0 and args.ebm_model is not None:
@@ -132,7 +143,7 @@ if __name__ == '__main__':
 
     ### Experiment Arguments ###
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
-
+    parser.add_argument('--save_time', default=True, action='store_true', help='save the time taken for the experiment')
     ### Purification Arguments ###
 
     parser.add_argument('--purify_reps', default=1, type=int, help='number of purification repetitions (when using both EBM and Diffusion)')
@@ -147,7 +158,7 @@ if __name__ == '__main__':
 
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
-    args_diff.add_argument('--diff_model', default='DDPM_UNET_EBM', type=none_or_str, choices=[None, 'DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
+    args_diff.add_argument('--diff_model', default=None, type=none_or_str, choices=[None, 'DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
     args_diff.add_argument('--diff_name', default='mcmc_steps1600_bank_fixer_cosine', type=str_or_str_list, help='path to the diffusion model')
     args_diff.add_argument('--diff_nf', default=128, type=int_or_int_list,  help='number of filters for the unet model')
     args_diff.add_argument('--diff_train_steps', default=1000, type=int_or_int_list, help='training t-steps for diffuion model')
