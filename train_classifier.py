@@ -48,8 +48,6 @@ def main(rank, args):
 
     train_transforms = get_train_transforms(args)
 
-    print(train_transforms)
-
     train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device)
 
     if 'HLB' in args.model and args.dataset in ['cifar10']:
@@ -92,7 +90,6 @@ def main(rank, args):
     else:
         test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
 
-    print(test_transforms)
     test_data = get_test_dataset(args, test_transforms)
 
     if 'HLB' in args.model and args.dataset in ['cifar10']:
@@ -134,7 +131,7 @@ def main(rank, args):
         if args.dataset == 'cifar10':
             total_train_steps = np.ceil(len(train_data) * args.epochs)
         else:
-            total_train_steps = np.ceil(len(train_data) / args.batch_size * args.epochs)
+            total_train_steps = np.ceil(len(train_data) / args.batch_size * args.epochs) + args.epochs
         lr_schedule = np.interp(np.arange(1+total_train_steps),
                             [0, int(0.2 * total_train_steps), total_train_steps],
                             [0.2, 1, 0]) # triangular learning rate schedule

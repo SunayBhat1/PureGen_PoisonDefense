@@ -628,7 +628,10 @@ def get_train_transforms(args):
             train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
         elif args.dataset in ['stl10','stl10_64']:
             train_transforms.append(transforms.Normalize(stl10_mean, stl10_std))
-        
+        elif args.dataset == 'tinyimagenet':
+            train_transforms.append(transforms.Normalize(tinyimagenet_mean, tinyimagenet_std))
+        else:
+            raise Exception(f"Dataset {args.dataset} transforms not supported for from_scratch poison mode")
     elif args.poison_mode == 'transfer':
         train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
 
