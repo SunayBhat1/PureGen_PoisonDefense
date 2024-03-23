@@ -16,12 +16,12 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --poison_type 'Narcissus';
 
 ### Node 8: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5;
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48 --lr 1e-5;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
 
 ### Node 7: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --lr 1e-5;
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64 --lr 1e-5;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
 
 ####################
 # Purificatiion #
