@@ -6,7 +6,6 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_xla.core.xla_model as xm
 
 """
 Floating point conversion.
@@ -701,7 +700,6 @@ class UNetModel(nn.Module):
                         use_scale_shift_norm=use_scale_shift_norm,
                     )
                 ]
-                xm.mark_step()
                 ch = int(mult * model_channels)
                 if ds in attention_resolutions:
                     layers.append(

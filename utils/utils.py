@@ -13,6 +13,13 @@ from utils.utils_optim import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass
+
+dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
+                'cinic10':{'num_classes':10,'img_dim':32},
+                'tinyimagenet':{'num_classes':200,'img_dim':64},
+                'stl10':{'num_classes':10,'img_dim':96},
+                'stl10_64':{'num_classes':10,'img_dim':64},
+                }
                 
 def set_args_from_config(args, config, section_name):
 
@@ -113,9 +120,18 @@ def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=
                 _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
                 logs['p_acc'].append(p_acc)
                 logs['t_acc'].append(t_acc)
+
+            else:
+                img_dim = dataset_dict[args.dataset]['img_dim']
+                target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
+                pred = torch.argmax(target_pred).item()
+                success = bool(pred == target_mask_label)
+                logs['p_acc'].append(success)
+                # correct_class = bool(pred == target_orig_label)
             
     elif not args.no_poison and args.poison_type != 'Narcissus':
-        target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
+        img_dim = dataset_dict[args.dataset]['img_dim']
+        target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
         pred = torch.argmax(target_pred).item()
         success = bool(pred == target_mask_label)
         logs['p_acc'][-1] = success
@@ -131,6 +147,7 @@ def get_test_acc(net, loader, device):
             images, labels = data
             images, labels = images.to(device), labels.to(device)
             outputs = net(images)
+            
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()

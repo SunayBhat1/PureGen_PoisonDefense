@@ -49,8 +49,8 @@ def save_poisons(args,poison_tuple_list, poison_indices, target, data_key):
 
     subfolder = os.path.join(args.data_dir,'PureDefense',args.dataset,'Poisons')
     # Create the directory if it doesn't exist
-    if args.poison_type == 'Gradient_Matching':
-        save_dir = os.path.join(args.data_dir, subfolder, 'Gradient_Matching')
+    if args.poison_type == 'GradientMatching':
+        save_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
         save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
@@ -82,8 +82,8 @@ def get_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
     
-    if args.poison_type == 'Gradient_Matching':
-        poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/Gradient_Matching/{target_index}'))
+    if args.poison_type == 'GradientMatching':
+        poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'PoisonDefense/Poisons/GradientMatching/',args.dataset,'ResNet34_250',f'{target_index}'))
 
     elif args.poison_type == 'Narcissus':
         if args.poison_mode == 'from_scratch':

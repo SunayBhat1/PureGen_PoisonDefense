@@ -48,6 +48,8 @@ def main(rank, args):
 
     train_transforms = get_train_transforms(args)
 
+    print(train_transforms)
+
     train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device)
 
     if 'HLB' in args.model and args.dataset in ['cifar10']:
@@ -85,9 +87,12 @@ def main(rank, args):
             test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
         elif args.dataset == 'stl10_64':
             test_transforms = transforms.Compose([transforms.Resize((64,64)),transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
+        elif args.dataset == 'tinyimagenet':
+            test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=tinyimagenet_mean, std=tinyimagenet_std)])
     else:
         test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
 
+    print(test_transforms)
     test_data = get_test_dataset(args, test_transforms)
 
     if 'HLB' in args.model and args.dataset in ['cifar10']:
@@ -255,7 +260,8 @@ def main(rank, args):
     if not args.no_poison:
 
         if args.poison_type != 'Narcissus':
-            target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
+            img_dim = dataset_dict[args.dataset]['img_dim']
+            target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
             pred = torch.argmax(target_pred).item()
             success = bool(pred == target_mask_label)
             correct_class = bool(pred == target_orig_label)
@@ -334,7 +340,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
     parser.add_argument('--model', default='HLB', type=str, choices=['HLB','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
-    parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--fine_tune', default=False, action='store_true',help="Whether retrain the full model (fine-tuning) or just the linear layer (default: False)")
     parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','Epic','Friendly'],help='type of defense to use')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
@@ -377,7 +383,7 @@ if __name__ == '__main__':
     # Error Checking
     ##############
 
-    if args.poison_type == 'Gradient_Matching' and args.poison_mode == 'transfer':
+    if args.poison_type == 'GradientMatching' and args.poison_mode == 'transfer':
         raise ValueError('Gradient Matching does not support transfer attacks')
     if args.poison_type == 'BullseyePolytope_Bench' and args.poison_mode == 'from_scratch':
         raise ValueError('BullseyePolytope_Bench does not support from_scratch attacks')
@@ -433,6 +439,9 @@ if __name__ == '__main__':
         if args.device_type == 'xla' and args.num_proc > 1:
             if args.poison_type == 'Narcissus' and args.selected_indices is None:
                 for args.start_target_index in [0,8]:
+                    xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
+            if args.poison_type == 'GradientMatching' and args.selected_indices is None:
+                for args.start_target_index in range(0,100,8):
                     xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
             else:
                 xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')

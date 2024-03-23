@@ -4,6 +4,9 @@
 
 ### Node1 Base: Testing HLB Integrations
 
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --poison_type 'GradientMatching' --num_proc 1 --dataset 'tinyimagenet';
+
+
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1 --dataset 'stl10';
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
 
@@ -23,6 +26,8 @@ python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'
 ####################
 # Purificatiion #
 ####################
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'GradientMatching' --dataset 'tinyimagenet';
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10_64';
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --dataset 'stl10_64' --num_images_narcissus 100;

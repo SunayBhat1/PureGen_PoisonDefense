@@ -33,7 +33,7 @@ def main(rank, args):
     else:
         if args.poison_type == 'Narcissus':
             target_indices = 10
-        elif args.poison_type == 'Gradient_Matching':
+        elif args.poison_type == 'GradientMatching':
             target_indices = 100
         elif args.poison_type == 'BullseyePolytope':
             if args.num_images_bp == 50:
@@ -74,6 +74,9 @@ def main(rank, args):
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
             elif args.dataset == 'stl10_64':
                 train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.Compose([torchvision.transforms.Resize(64),torchvision.transforms.ToTensor()]))
+                train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+            elif args.dataset == 'tinyimagenet':
+                train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=torchvision.transforms.ToTensor())
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)
@@ -161,7 +164,7 @@ if __name__ == '__main__':
         
 
     ### Poison Arguments ###
-    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
