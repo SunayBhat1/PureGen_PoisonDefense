@@ -69,7 +69,7 @@ def get_device(device_type='xla'):
 def check_training_end(args,target_index):
     if args.poison_type == 'Narcissus' and target_index >= 10: 
         return True
-    elif args.poison_type == 'Gradient_Matching' and target_index >= 100:
+    elif args.poison_type == 'GradientMatching' and target_index >= 100:
         return True
     elif args.poison_type == 'BullseyePolytope' and target_index >= 50:
         return True

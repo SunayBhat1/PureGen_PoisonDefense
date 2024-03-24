@@ -27,6 +27,7 @@ python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'
 # Purificatiion #
 ####################
 
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'tinyimagenet';
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'GradientMatching' --dataset 'tinyimagenet';
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10_64';
