@@ -636,7 +636,8 @@ def get_train_transforms(args):
         train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
 
     if args.baseline_defense == 'Friendly' or args.aug_rand_transforms:
-        train_transforms.append(RandomTransform(**dict(source_size=32, target_size=32, shift=8, fliplr=True), mode='bilinear'))
+        img_size = dataset_dict[args.dataset]['img_dim']
+        train_transforms.append(RandomTransform(**dict(source_size=img_size, target_size=img_size, shift=8, fliplr=True), mode='bilinear'))
 
     if args.aug_cutout:
         train_transforms.append(Cutout(n_holes=8, length=8))

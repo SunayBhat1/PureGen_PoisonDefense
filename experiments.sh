@@ -70,7 +70,7 @@ scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth suna
 (
 # Clone 
 mkdir data;
-git clone https://github.com/SunayBhat1/PureDefense
+git clone https://github.com/SunayBhat1/PureGen_Defense
 # Create a data dir
 pip install tqdm;
 pip install pandas;

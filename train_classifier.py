@@ -64,11 +64,18 @@ def main(rank, args):
     if args.baseline_defense == 'Friendly':
         
         if args.poison_mode == 'from_scratch':
-            train_transforms_no_augs = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
-            train_data_no_augs = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
+            if args.dataset in ['cifar10','cinic10']:
+                train_transforms_no_augs = transforms.Compose([transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
+            elif args.dataset in ['stl10','stl10_64']:
+                train_transforms_no_augs = transforms.Compose([transforms.Normalize(mean=stl10_mean, std=stl10_std)])
+            elif args.dataset == 'tinyimagenet':
+                train_transforms_no_augs = transforms.Compose([transforms.Normalize(mean=tinyimagenet_mean, std=tinyimagenet_std)])
+            else:
+                raise ValueError('Friendly Defense not supported for this dataset')
+            train_data_no_augs, _ = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
         else:
             train_transforms_no_augs = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
-            train_data_no_augs = get_base_poisoned_dataset(args,target_index,train_transforms,device)
+            train_data_no_augs, _ = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
 
         train_loader_noaugs = torch.utils.data.DataLoader(train_data_no_augs, batch_size=args.batch_size, shuffle=True,num_workers=4)
 
@@ -180,7 +187,7 @@ def main(rank, args):
         # Craft Friendly Noise if Friendly Defense
         if args.baseline_defense == 'Friendly' and 'friendly' in args.friendly_noise_type and epoch == args.friendly_begin_epoch:
             friendly_noise = generate_friendly_noise(target_net,train_loader_noaugs,device,args.device_type,friendly_epochs=args.friendly_epochs,mu=args.friendly_mu,
-                                                        friendly_lr=args.friendly_lr, clamp_min=-args.friendly_clamp / 255, clamp_max=args.friendly_clamp / 255,model_train=True,
+                                                        friendly_lr=args.friendly_lr, clamp_min=-args.friendly_clamp / 255, clamp_max=args.friendly_clamp / 255,model_train=True,img_dim = dataset_dict[args.dataset]['img_dim']
                                                     )
             target_net.zero_grad()
             if args.device_type == 'xla': xm.mark_step()
