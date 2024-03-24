@@ -826,7 +826,7 @@ class ResNet_HLB(nn.Module):
             self.in_planes = planes
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, penu=False):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
@@ -834,6 +834,10 @@ class ResNet_HLB(nn.Module):
         out = self.layer4(out)
         out = F.avg_pool2d(out, 4)
         pre_out = out.view(out.size(0), -1)
+
+        if penu:
+            return pre_out
+        
         final = self.linear(pre_out)
         return final
 
