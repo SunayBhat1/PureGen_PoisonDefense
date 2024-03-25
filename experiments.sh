@@ -15,20 +15,17 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB 
 ## Node 5 Narc 0-10%
 # Create Narcissus Poisons
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --num_images_narcissus 0,500,1000,2500,5000 --poison_type 'Narcissus' --num_proc 8;
-# create Purified Poisons
+# create Purified Base Data
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'Narcissus' --num_images_narcissus 500,1000,2500,5000 --num_proc 8;
 # Puriifeid baseline
 python3 purify.py --remote_user 'sunaybhat' --diff_model None;
 
 # Train Narcissus Poisons
 for i in 500 1000 2500 5000; do
-    python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --poison_type 'Narcissus';
-    python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --poison_type 'Narcissus' --data_key 'EBMSNGAN32[ebm_cifar10_45k]_150Steps_T0.0001';
+    python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --poison_type 'Narcissus' --data_key 'EBMSNGAN32[cifar10_45k_ep520_nf128]_150Steps_T0.0001';
 done
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --data_key 'EBMSNGAN32[cifar10_45k_ep520_nf128]_150Steps_T0.0001';
 
-# No Posions
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --data_key 'EBMSNGAN32[ebm_cifar10_45k]_150Steps_T0.0001';
 
 # ### Node 8: Train small EBMS CINIC-10 
 # python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
