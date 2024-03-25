@@ -886,7 +886,7 @@ def load_poisons(args,target_index):
     if args.poison_type == 'GradientMatching':
         load_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
-        load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}')
+        load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
         if args.fine_tune: bp_subpath = 'end2end-training'
         else: bp_subpath = 'linear-transfer-learning'
