@@ -2,26 +2,41 @@
 # Nodes Lists #
 ###############
 
-### Node1 Base: Testing HLB Integrations
+### Node1 Base: Res18_HLB GM
 
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --poison_type 'GradientMatching' --num_proc 1 --dataset 'tinyimagenet';
+# Purify
+python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'tinyimagenet_ep780_nf256' --ebm_nf 256 --ebm_lang_steps 150 --diff_model None --dataset 'tinyimagenet';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'tinyimagenet_ep780_nf256' --ebm_nf 256 --ebm_lang_steps 150 --diff_model None --dataset 'tinyimagenet' --poison_type 'GradientMatching';
 
-
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1 --dataset 'stl10';
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
-
-
-## Node 5 Narc 0-100%
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --num_images_narcissus
+# Train
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --data_key 'EBMSNGAN32[tinyimagenet_ep780_nf256_nf256]_150Steps_T0.0001' --dataset 'tinyimagenet' --poison_type 'GradientMatching';
 
 
-### Node 8: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+## Node 5 Narc 0-10%
+# Create Narcissus Poisons
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --num_images_narcissus 0,500,1000,2500,5000 --poison_type 'Narcissus' --num_proc 8;
+# create Purified Poisons
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'Narcissus' --num_images_narcissus 500,1000,2500,5000 --num_proc 8;
+# Puriifeid baseline
+python3 purify.py --remote_user 'sunaybhat' --diff_model None;
 
-### Node 7: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --lr 1e-5 --lr_decay_milestones 25 50 75 100;
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+# Train Narcissus Poisons
+for i in 500 1000 2500 5000; do
+    python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --poison_type 'Narcissus';
+    python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --poison_type 'Narcissus' --data_key 'EBMSNGAN32[ebm_cifar10_45k]_150Steps_T0.0001';
+done
+
+# No Posions
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --data_key 'EBMSNGAN32[ebm_cifar10_45k]_150Steps_T0.0001';
+
+# ### Node 8: Train small EBMS CINIC-10 
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+
+# ### Node 7: Train small EBMS CINIC-10 
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
 
 ####################
 # Purificatiion #
