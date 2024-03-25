@@ -12,7 +12,7 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18
 
 
 ## Node 5 Narc 0-100%
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None 
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --num_images_narcissus
 
 
 ### Node 8: Train small EBMS CINIC-10 
