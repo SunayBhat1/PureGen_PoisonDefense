@@ -91,9 +91,9 @@ def main(rank, args):
         ### Save the purified data ###
         data_key = ''
         if args.ebm_lang_steps > 0 and args.ebm_model is not None:
-            data_key += f'{args.ebm_model}[{args.ebm_name}_nf{args.ebm_nf}]_{args.ebm_lang_steps}Steps_T{args.ebm_lang_temp}'
+            data_key += f'{args.ebm_model}[{args.ebm_name}]_Steps[{args.ebm_lang_steps}]_T[{args.ebm_lang_temp}]'
         if args.diff_purify_steps > 0 and args.diff_model is not None:
-            data_key += f'_{args.diff_model}[{args.diff_name}_nf{args.diff_nf}]_beta[{args.diff_train_steps}_{args.diff_schedule}]_{args.diff_purify_steps}Steps_{args.diff_eta}eta'
+            data_key += f'_{args.diff_model}[{args.diff_name}]_beta[{args.diff_train_steps}_{args.diff_schedule}]_Steps[{args.diff_purify_steps}]_eta[{args.diff_eta}]'
         if args.ebm_lang_steps > 0 and args.diff_purify_steps > 0 and args.purify_reps > 1 and args.ebm_model is not None and args.diff_model is not None:
             data_key += f'_reps{args.purify_reps}'
         

@@ -445,7 +445,7 @@ if __name__ == '__main__':
             if args.poison_type == 'Narcissus' and args.selected_indices is None:
                 for args.start_target_index in [0,8]:
                     xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
-            if args.poison_type == 'GradientMatching' and args.selected_indices is None:
+            elif args.poison_type == 'GradientMatching' and args.selected_indices is None:
                 for args.start_target_index in range(0,100,8):
                     xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
             else:
