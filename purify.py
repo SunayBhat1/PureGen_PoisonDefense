@@ -167,7 +167,7 @@ if __name__ == '__main__':
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
-    parser.add_argument('--num_images_narcissus', default=500, type=num_images_narcissus, help='number of poisoned images generated')
+    parser.add_argument('--num_images_narcissus', default=500, type=int_or_int_list, help='number of poisoned images generated')
     parser.add_argument('--random_imgs_narcissus', default=False, action='store_true', help='use random images for narcissus')
     parser.add_argument('--iters_bp', default=800, type=int,help='iterations for making poison')
     parser.add_argument('--num_images_bp', default=50, type=int,help='number of poisoned images generated')
