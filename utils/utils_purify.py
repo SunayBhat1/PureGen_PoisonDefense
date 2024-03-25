@@ -52,7 +52,7 @@ def save_poisons(args,poison_tuple_list, poison_indices, target, data_key):
     if args.poison_type == 'GradientMatching':
         save_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
-        save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}')
+        save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
         if args.fine_tune: bp_subpath = 'end2end-training'
         else: bp_subpath = 'linear-transfer-learning'
@@ -94,13 +94,13 @@ def get_poisons(args,target_index):
             if args.dataset == 'stl10':
                 # Map stl classes to cifar classes
                 stl_cifar_label_map = {0: 0, 1: 2, 2: 1, 3: 3, 4: 4, 5: 5, 6: 7, 7: 6, 8: 8, 9: 9}
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
+                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'PoisonDefense/Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
             else:
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'PoisonDefense/Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
         elif args.poison_mode == 'transfer':
-            poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'PoisonDefense/Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list=None, transfer_subset=True)
     elif args.poison_type == 'BullseyePolytope':
 
