@@ -263,7 +263,7 @@ def process_args(args, rank):
     Function to process the arguments for distributed training
     '''
     # List of argument names to process
-    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_train_steps', 'diff_purify_steps', 'diff_eta','ebm_name','diff_name','ebm_nf','diff_nf']
+    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_train_steps', 'diff_purify_steps', 'diff_eta','ebm_name','diff_name','ebm_nf','diff_nf','num_images_narcissus']
 
     for arg_name in arg_names:
         arg_value = getattr(args, arg_name)

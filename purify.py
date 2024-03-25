@@ -46,7 +46,7 @@ def main(rank, args):
         purify_pbar = False
 
     # Get diff and ebm model paths
-    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.ebm_name+'.pt')
+    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'PoisonDefense','models',args.ebm_model,args.ebm_name+'.pt')
     else: ebm_path = None
     if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.diff_name+'.pt')
     else: diff_path = None
@@ -129,12 +129,11 @@ if __name__ == '__main__':
 
     ### Setup Arguments ###
     parser.add_argument('--remote_user', type=str, help='username for the remote server (TPU only, else pass in full directory args below)')
-    # parser.add_argument('--num_proc', type=int, default=8, help='number of processes for TPU')
+    parser.add_argument('--num_proc', type=int, default=1, help='number of processes for TPU')
     parser.add_argument('--device_type', default='xla', type=str, choices=['xla','cuda','cpu','mps'],help='device type to use')
     parser.add_argument('--seed', default=11, type=int,help='seed for reproducibility')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
     parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
-    parser.add_argument('--num_proc', type=int, default=1, help='number of processes for TPU')
 
     ### Experiment Arguments ###
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
@@ -168,7 +167,7 @@ if __name__ == '__main__':
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
-    parser.add_argument('--num_images_narcissus', default=500, type=int, help='number of poisoned images generated')
+    parser.add_argument('--num_images_narcissus', default=int_or_int_list, type=int, help='number of poisoned images generated')
     parser.add_argument('--random_imgs_narcissus', default=False, action='store_true', help='use random images for narcissus')
     parser.add_argument('--iters_bp', default=800, type=int,help='iterations for making poison')
     parser.add_argument('--num_images_bp', default=50, type=int,help='number of poisoned images generated')

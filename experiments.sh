@@ -11,9 +11,9 @@ python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB 
 python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
 
 
-## STL 10
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --poison_type 'Narcissus';
+## Node 5 Narc 0-100%
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None 
+
 
 ### Node 8: Train small EBMS CINIC-10 
 python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
