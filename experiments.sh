@@ -5,26 +5,14 @@
 ### Node1 Base: Res18_HLB GM
 
 # Purify
-python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'tinyimagenet_ep780_nf256' --ebm_nf 256 --ebm_lang_steps 150 --diff_model None --dataset 'tinyimagenet';
-python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'tinyimagenet_ep780_nf256' --ebm_nf 256 --ebm_lang_steps 150 --diff_model None --dataset 'tinyimagenet' --poison_type 'GradientMatching';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
 
 # Train
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --data_key 'EBMSNGAN32[tinyimagenet_ep780_nf256_nf256]_150Steps_T0.0001' --dataset 'tinyimagenet' --poison_type 'GradientMatching';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --data_key 'EBMSNGAN32[cifar10_45k_ep520_nf128]_Steps[150]_T[0.0001]';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --data_key 'EBMSNGAN32[officehome_ep500_nf128]_Steps[150]_T[0.0001]';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB;
 
-
-## Node 5 Narc 0-10%
-# Create Narcissus Poisons
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --num_images_narcissus 0,500,1000,2500,5000 --poison_type 'Narcissus' --num_proc 8;
-# create Purified Base Data
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'Narcissus' --num_images_narcissus 500,1000,2500,5000 --num_proc 8;
-# Puriifeid baseline
-python3 purify.py --remote_user 'sunaybhat' --diff_model None;
-
-# Train Narcissus Poisons
-for i in 500 1000 2500 5000; do
-    python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --poison_type 'Narcissus' --data_key 'EBMSNGAN32[cifar10_45k_ep520_nf128]_150Steps_T0.0001';
-done
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --num_images_narcissus $i --data_key 'EBMSNGAN32[cifar10_45k_ep520_nf128]_150Steps_T0.0001';
 
 
 # ### Node 8: Train small EBMS CINIC-10 
