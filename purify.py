@@ -46,9 +46,9 @@ def main(rank, args):
         purify_pbar = False
 
     # Get diff and ebm model paths
-    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'PoisonDefense','models',args.ebm_model,args.ebm_name+'.pt')
+    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'PureGen_Models',args.ebm_model,args.ebm_name+'.pt')
     else: ebm_path = None
-    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.diff_name+'.pt')
+    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'PureGen_Models',args.diff_model,args.diff_name+'.pt')
     else: diff_path = None
 
     # Create the PureDefense object
@@ -101,9 +101,9 @@ def main(rank, args):
             data_key = 'Baseline'
 
         if args.poison_type is None:
-            if not os.path.exists(os.path.join(args.data_dir,'PureDefense',args.dataset)):
-                os.makedirs(os.path.join(args.data_dir,'PureDefense',args.dataset))
-            torch.save(purified_data,os.path.join(args.data_dir,'PureDefense',args.dataset,f'{data_key}.pt'))
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset)):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,f'{data_key}.pt'))
         else:
             save_dir = save_poisons(args,purified_data, poison_indices, target_mask_label, data_key)
 

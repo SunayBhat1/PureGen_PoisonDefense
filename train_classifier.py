@@ -339,7 +339,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_poison', default=False, action='store_true',help='whether to run the attack or not')
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
-    parser.add_argument('--output_dir', default='/home/results_PureDefense/', type=str, help='path to the output directory')
+    parser.add_argument('--output_dir', default='/home/results_PureGen_PoisonDefense/', type=str, help='path to the output directory')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
 
     ### Experiment Arguments ###

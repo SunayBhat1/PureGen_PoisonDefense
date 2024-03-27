@@ -83,7 +83,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
     else:
 
-        base_data = torch.load(os.path.join(args.data_dir,'PureDefense',args.dataset,args.data_key + '.pt'))
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
 
         poison_tuple_list, poison_indices, target_mask_label = load_poisons(args,target_index)
 
@@ -881,7 +881,7 @@ def load_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureDefense',args.dataset,'Poisons')
+    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons')
 
     if args.poison_type == 'GradientMatching':
         load_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
