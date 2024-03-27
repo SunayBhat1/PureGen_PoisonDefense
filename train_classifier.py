@@ -173,7 +173,10 @@ def main(rank, args):
     if args.dataset == 'cinic10': logs['cifar_acc'] = []
 
     if args.baseline_defense == 'Epic':
-        times_selected = torch.zeros(len(train_data), dtype=torch.int32)
+        if 'HLB' in args.model and args.dataset in ['cifar10']:
+            times_selected = torch.zeros(len(train_loader.images), dtype=torch.int32)
+        else:
+            times_selected = torch.zeros(len(train_data), dtype=torch.int32)
         base_loader = train_loader
         logs['subset_size'] = {}
 
