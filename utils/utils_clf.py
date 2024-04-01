@@ -34,6 +34,7 @@ tinyimagenet_std = (0.2302, 0.2265, 0.2262)
 
 # Dataset info dict
 dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
+                'cifar10_NGT':{'num_classes':10,'img_dim':32},
                 'cinic10':{'num_classes':10,'img_dim':32},
                 'tinyimagenet':{'num_classes':200,'img_dim':64},
                 'stl10':{'num_classes':10,'img_dim':96},
@@ -43,6 +44,7 @@ dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
 # dataset_info dict
 dataset_info = {'from_scratch':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 5000},
+                    'cifar10_NGT': {'num_classes': 10, 'num_per_label': 5000},
                     'cinic10': {'num_classes': 10, 'num_per_label': 9000},
                     'tinyimagenet': {'num_classes': 200, 'num_per_label': 500},
                     'stl10': {'num_classes': 10, 'num_per_label': 500},
@@ -81,6 +83,10 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
             
         target_mask_label = None
 
+    elif args.poison_type == 'NGT':
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT',args.data_key + '.pt'))
+        base_data = Simple_Dataset_Base(base_data, transforms=transforms.Compose([transforms.ToTensor()]))
+        target_mask_label = None
     else:
 
         base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
@@ -120,7 +126,10 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
                 
     base_loader = data.DataLoader(base_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    train_data = PoisonedDataset(base_loader, poisoned = not args.no_poison, transform=train_transforms)
+    if args.poison_type == 'NGT':
+        train_data = PoisonedDataset(base_loader, poisoned = False, transform=train_transforms)
+    else:
+        train_data = PoisonedDataset(base_loader, poisoned = not args.no_poison, transform=train_transforms)
 
     if 'HLB' in args.model and args.dataset == 'cifar10':
         aug = {'flip': args.hlb_flip}
@@ -255,6 +264,27 @@ class Poisoned_Dataset_Base(data.Dataset):
             idx = self.valid_indices[index - len(self.poison_tuple_list)]
             img, label = self.img_label_list[idx]
         return self.transforms(img), label, index, p
+
+class Simple_Dataset_Base(data.Dataset):
+    def __init__(self, base_dataset, transforms):
+        """
+        Args:
+            base_dataset (Dataset): The base dataset.
+            transforms (callable): A function/transform that takes in an PIL image and returns a transformed version.
+        """
+
+        self.base_dataset = base_dataset
+        self.img_label_list = [(img, label) for img, label in base_dataset]
+        self.transforms = transforms
+        self.valid_indices = list(range(len(self.img_label_list)))
+
+    def __len__(self):
+        return len(self.valid_indices)
+
+    def __getitem__(self, index):
+        idx = self.valid_indices[index]
+        img, label = self.img_label_list[idx]
+        return self.transforms(img), label
 
 class PoisonedDataset_Bench(data.Dataset):
     def __init__(
@@ -406,7 +436,7 @@ class CifarLoader:
 ###################
                 
 def get_test_dataset(args, transform):
-    if args.dataset == 'cifar10':
+    if args.dataset == 'cifar10' or args.dataset == 'cifar10_NGT':
         test_data = CIFAR10(args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=transform)
     elif args.dataset == 'cinic10':
         test_data = ImageFolder(os.path.join(args.data_dir, 'CINIC-10/test'), transform=transform)
@@ -582,6 +612,16 @@ def batch_cutout(inputs, size):
 #############
     
 def get_train_transforms(args):
+    if args.poison_type == 'NGT':
+
+        train_transforms = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((cifar_mean), (cifar_std)),
+            ])
+        
+        return train_transforms
     if args.poison_mode == 'from_scratch' or args.poison_type in ['BullseyePolytope_Bench','Narcissus']:
         if args.dataset in ['cifar10','cinic10']:
             train_transforms = [transforms.RandomCrop(32, padding=4),

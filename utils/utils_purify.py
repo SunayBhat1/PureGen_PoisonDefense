@@ -282,3 +282,64 @@ def process_args(args, rank):
             return None
 
     return args
+
+######################
+# NGT Attack Dataset #
+######################
+
+# cifar_transform = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.RandomCrop(32, padding=4),
+#     transforms.RandomHorizontalFlip(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((cifar_mean), (cifar_std)),
+# ])
+
+# cifar_transform_test = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((cifar_mean), (cifar_std)),
+# ])
+
+cifar_transform_purify = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.ToTensor(),
+    # transforms.Normalize((cifar_mean), (cifar_std)),
+])
+
+class AdvDataSet(torch.utils.data.Dataset):
+    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
+        self.img_labels = np.argmax(np.load(annotations_file),axis=1)
+        self.transform = transform
+        self.target_transform = target_transform
+        # self.dataset = np.load(img_dir)
+        self.dataset = np.uint8(np.load(img_dir)*255)
+        
+
+    def __len__(self):
+        return len(self.img_labels)
+
+    def __getitem__(self, idx):
+        image = self.dataset[idx]
+        label = self.img_labels[idx]
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label   
+
+
+def get_ngt(data_root,train=True,transform=transforms.Compose([transforms.ToTensor()]),jpeg=None):
+
+    if train:
+        if jpeg is None:
+            x_train = os.path.join(data_root, 'x_train_cifar10_ntga_cnn_best.npy')
+        else:
+            x_train = os.path.join(data_root, f'x_train_cifar10_ntga_cnn_best_jpeg_compressed_{jpeg}.npy')
+        y_train = os.path.join(data_root, 'y_train_cifar10.npy')
+        dataset = AdvDataSet(y_train,x_train,transform=transform)
+    else:
+        x_test = os.path.join(data_root, 'x_val_cifar10.npy')
+        y_test = os.path.join(data_root, 'y_val_cifar10.npy')
+        dataset = AdvDataSet(y_test,x_test,transform=transform)
+
+    return dataset

@@ -21,8 +21,19 @@ except: pass
 from utils.utils import *
 from utils.utils_clf import *
 from utils.utils_baselines import *
+from utils.adam_wq import *
+from utils.SMD_opt import *
 
 def main(rank, args):
+
+    if rank == 0: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[300]_T[0.0001]'
+    elif rank == 1: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[1500]_T[0.0001]_compressed50'
+    elif rank == 2: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[500]_T[0.0001]_compressed75'
+    elif rank == 3: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[500]_T[0.0001]_compressed85'
+    elif rank == 4: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[600]_T[0.0001]'
+    elif rank == 5: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[1500]_T[0.0001]_compressed75'
+    elif rank == 6: target_index = None
+    elif rank == 7: target_index = None
 
     ##############################
     # Setup
@@ -30,7 +41,10 @@ def main(rank, args):
 
     # Set the device and seed (if not None)
     device = get_device(args.device_type)
-    set_seed(args.seed, device, args.device_type)
+    if args.poison_type == 'NGT':
+        set_seed(args.seed+rank, device, args.device_type)
+    else:
+        set_seed(args.seed, device, args.device_type)
 
     # Set the poison target index (image or class label) and check if training index is out of bounds (for TPU)
     target_index = set_target_index_and_check_end(args, rank)
@@ -57,7 +71,8 @@ def main(rank, args):
 
     # Print training data details
     if args.verbose:
-        p_count = sum(p.sum().item() for _, _, _, p in train_loader) 
+        if args.poison_type == 'NGT': p_count = 0
+        else: p_count = sum(p.sum().item() for _, _, _, p in train_loader) 
         if 'HLB' in args.model and args.dataset in ['cifar10']: print(f'Loaded training data {len(train_loader.images)} samples, {p_count} poisoned or {p_count/len(train_loader.images):.2%} poisoned')
         else: print(f'Loaded training data {len(train_loader.dataset)} samples, {p_count} poisoned or {p_count/len(train_loader.dataset):.2%} poisoned')
 
@@ -84,9 +99,7 @@ def main(rank, args):
     ##########################
         
     if args.poison_mode == 'from_scratch':
-        if args.dataset == 'cifar10':
-            test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
-        elif args.dataset == 'cinic10':
+        if args.dataset in ['cifar10','cinic10','cifar10_NGT']:
             test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean_gm, std=cifar_std_gm)])
         elif args.dataset == 'stl10':
             test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
@@ -111,7 +124,7 @@ def main(rank, args):
         else:
             cifar_test_loader = torch.utils.data.DataLoader(cifar_test_data, batch_size=128,num_workers=4)
 
-    if not args.no_poison:
+    if not args.no_poison and args.poison_type != 'NGT':
         if args.poison_type == 'Narcissus':
             test_trigger_loaders = get_poisons_target(args, target_index, test_transforms, target_mask = target_mask_label)
         else:
@@ -132,6 +145,9 @@ def main(rank, args):
 
     # Optimizer
     optimizer = get_optimizer(args,target_net)
+    # optimizer = AdamWq(target_net.parameters())
+
+    # optimizer = SMD_qnorm(target_net.parameters(), lr=0.2, momentum=0.9, weight_decay=5e-4, nesterov=True, q=1.5)
 
     # Scheduler
     if 'HLB' in args.model:
@@ -165,7 +181,7 @@ def main(rank, args):
     # Training Logs
     logs = {'train_loss': [], 'test_acc': []}
 
-    if not args.no_poison: 
+    if not args.no_poison or args.poison_type == 'NGT':
         logs['p_acc'] = []
         if args.poison_type == 'Narcissus': 
             logs['t_acc'] = []
@@ -219,6 +235,7 @@ def main(rank, args):
             # Backward pass
             optimizer.zero_grad()
             loss = criterion(output, target)
+        
             if 'HLB' in args.model:
                 loss.sum().backward()
                 optimizer.step()
@@ -261,7 +278,7 @@ def main(rank, args):
     if args.dataset == 'cinic10':
         cifar_end_acc = get_test_acc(target_net, cifar_test_loader, device)
 
-    if not args.no_poison:
+    if not args.no_poison and args.poison_type != 'NGT':
 
         if args.poison_type != 'Narcissus':
             img_dim = dataset_dict[args.dataset]['img_dim']
@@ -282,7 +299,7 @@ def main(rank, args):
     # Save the results and models
     ##############################
                 
-    if args.no_poison:
+    if args.no_poison or args.poison_type == 'NGT':
         get_accs_save_results_clean(args, rank, target_index, end_acc, training_time, logs)
     else:
         if args.poison_type != 'Narcissus':
@@ -297,7 +314,7 @@ def main(rank, args):
         torch.save(target_net.to('cpu').state_dict(), os.path.join(model_save_dir,'model.pt'))
 
     # Print the results
-    if args.no_poison:
+    if args.no_poison or args.poison_type == 'NGT':
         print(f'Index {target_index} | Training Time {training_time} | End Acc {end_acc:.2%}')
     else:
         if args.device_type == 'xla' and xm.is_master_ordinal():
@@ -340,11 +357,11 @@ if __name__ == '__main__':
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
 
     ### Experiment Arguments ###
-    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
+    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cifar10_NGT','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
     parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
     parser.add_argument('--model', default='HLB', type=str, choices=['HLB','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
-    parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus','NGT','GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--fine_tune', default=False, action='store_true',help="Whether retrain the full model (fine-tuning) or just the linear layer (default: False)")
     parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','Epic','Friendly'],help='type of defense to use')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
@@ -414,6 +431,8 @@ if __name__ == '__main__':
     args.experiment_timestamp = time.strftime("%Y_%m_%d_%H_%M", time.localtime())
     if args.no_poison:
         args.output_dir = os.path.join(args.output_dir, 'Clean')
+    elif args.poison_type == 'NGT':
+        args.output_dir = os.path.join(args.output_dir, 'NGT')
     else:
         if args.poison_mode == 'from_scratch':
             sub_folder = args.poison_mode.title()

@@ -10,7 +10,8 @@ except: pass
 
 from utils.utils import *
 
-from utils.utils_purify import get_poisons, ImageListDataset, save_poisons, process_args
+from utils.utils_purify import get_poisons, ImageListDataset, save_poisons, process_args, get_ngt
+# from utils.utils_ngt import get_ngt
 
 
 ### Main Function ###
@@ -21,13 +22,39 @@ def main(rank, args):
     set_seed(args.seed, device, args.device_type)
 
     # Process the arguments for each rank
-    args = process_args(args,rank)
+    # args = process_args(args,rank)
+
+    if rank == 0:
+        args.jpeg = 85
+        args.ebm_lang_steps = 1500
+    elif rank == 1:
+        args.jpeg = 25
+        args.ebm_lang_steps = 1250
+    elif rank == 2:
+        args.jpeg = 50
+        args.ebm_lang_steps = 1250
+    elif rank == 3:
+        args.jpeg = 75
+        args.ebm_lang_steps = 1250
+    elif rank == 4:
+        args.jpeg = 85
+        args.ebm_lang_steps = 1250
+    elif rank == 5:
+        # args.jpeg = 85
+        args.ebm_lang_steps = 1250
+    elif rank == 6:
+        # args.jpeg = 75
+        args.ebm_lang_steps = 750
+    elif rank == 7:
+        args.jpeg = 85
+        args.ebm_lang_steps = 1750
+
     if args is None:
         xm.rendezvous('training end!')
         return
     
     # Get the data loader and number of target indices
-    if args.poison_type is None:
+    if args.poison_type in [None,'NGT']:
         target_indices = 1
         purify_pbar = True
     else:
@@ -78,6 +105,9 @@ def main(rank, args):
             elif args.dataset == 'tinyimagenet':
                 train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=torchvision.transforms.ToTensor())
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+        elif args.poison_type == 'NGT':
+            train_data = get_ngt(os.path.join(args.data_dir,'NGT'),True, transform=torchvision.transforms.ToTensor(),jpeg=args.jpeg)
+            train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)
             train_loader = torch.utils.data.DataLoader(ImageListDataset(poison_tuple_list), batch_size=128, shuffle=False, num_workers=4)
@@ -100,10 +130,17 @@ def main(rank, args):
         if data_key == '':
             data_key = 'Baseline'
 
+        if args.jpeg is not None:
+            data_key += f'_compressed{args.jpeg}'
+
         if args.poison_type is None:
             if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset)):
                 os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset))
             torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,f'{data_key}.pt'))
+        elif args.poison_type == 'NGT':
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT')):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT'))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT',f'{data_key}.pt'))
         else:
             save_dir = save_poisons(args,purified_data, poison_indices, target_mask_label, data_key)
 
@@ -134,7 +171,8 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=11, type=int,help='seed for reproducibility')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
     parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
-
+    parser.add_argument('--jpeg', default=None, type=int, help='jpeg compression quality')
+    
     ### Experiment Arguments ###
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
 
@@ -163,7 +201,7 @@ if __name__ == '__main__':
         
 
     ### Poison Arguments ###
-    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench','NGT'],help='type of poison to generate')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')

@@ -115,7 +115,7 @@ def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=
                 cifar_acc = get_test_acc(target_net, cifar_test_loader, device)
             logs['cifar_acc'].append(cifar_acc)
 
-        if not args.no_poison:
+        if not args.no_poison and args.poison_type != 'NGT':
             if args.poison_type == 'Narcissus':
                 _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
                 logs['p_acc'].append(p_acc)
@@ -216,7 +216,7 @@ def update_progress_bar(args, pbar, epoch, logs):
 
     # Update progress bar
     pbar.update(1)
-    if args.no_poison:
+    if args.no_poison or args.poison_type == 'NGT':
         pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%}')
     elif args.poison_type != 'Narcissus':
         pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%} | Poison Success {logs["p_acc"][-1]} | ')
