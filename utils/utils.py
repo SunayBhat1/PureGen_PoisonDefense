@@ -13,6 +13,13 @@ from utils.utils_optim import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass
+
+dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
+                'cinic10':{'num_classes':10,'img_dim':32},
+                'tinyimagenet':{'num_classes':200,'img_dim':64},
+                'stl10':{'num_classes':10,'img_dim':96},
+                'stl10_64':{'num_classes':10,'img_dim':64},
+                }
                 
 def set_args_from_config(args, config, section_name):
 
@@ -62,7 +69,7 @@ def get_device(device_type='xla'):
 def check_training_end(args,target_index):
     if args.poison_type == 'Narcissus' and target_index >= 10: 
         return True
-    elif args.poison_type == 'Gradient_Matching' and target_index >= 100:
+    elif args.poison_type == 'GradientMatching' and target_index >= 100:
         return True
     elif args.poison_type == 'BullseyePolytope' and target_index >= 50:
         return True
@@ -108,14 +115,23 @@ def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=
                 cifar_acc = get_test_acc(target_net, cifar_test_loader, device)
             logs['cifar_acc'].append(cifar_acc)
 
-        if not args.no_poison:
+        if not args.no_poison and args.poison_type != 'NGT':
             if args.poison_type == 'Narcissus':
                 _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
                 logs['p_acc'].append(p_acc)
                 logs['t_acc'].append(t_acc)
+
+            else:
+                img_dim = dataset_dict[args.dataset]['img_dim']
+                target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
+                pred = torch.argmax(target_pred).item()
+                success = bool(pred == target_mask_label)
+                logs['p_acc'].append(success)
+                # correct_class = bool(pred == target_orig_label)
             
     elif not args.no_poison and args.poison_type != 'Narcissus':
-        target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
+        img_dim = dataset_dict[args.dataset]['img_dim']
+        target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
         pred = torch.argmax(target_pred).item()
         success = bool(pred == target_mask_label)
         logs['p_acc'][-1] = success
@@ -131,6 +147,7 @@ def get_test_acc(net, loader, device):
             images, labels = data
             images, labels = images.to(device), labels.to(device)
             outputs = net(images)
+            
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
@@ -199,7 +216,7 @@ def update_progress_bar(args, pbar, epoch, logs):
 
     # Update progress bar
     pbar.update(1)
-    if args.no_poison:
+    if args.no_poison or args.poison_type == 'NGT':
         pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%}')
     elif args.poison_type != 'Narcissus':
         pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%} | Poison Success {logs["p_acc"][-1]} | ')

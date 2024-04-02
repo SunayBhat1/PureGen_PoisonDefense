@@ -99,7 +99,7 @@ class PureDefense:
 
         return list(zip(input_list, label_list))
 
-    def ebm_purify(self,X_input,langevin_steps,langevin_temp=1e-4,requires_grad=True):
+    def ebm_purify(self,X_input,langevin_steps,langevin_temp=1e-4):
         """
         Purifies the input tensor X using the Energy-Based Model (EBM).
 
@@ -119,24 +119,16 @@ class PureDefense:
         langevin_eps = 1.25e-2
 
         # Set true for MCMC
-        if requires_grad:
-            X_purify = torch.autograd.Variable(X_input.clone(), requires_grad=True)
+        X_purify = torch.autograd.Variable(X_input.clone(), requires_grad=True)
 
         X_purify = X_purify + langevin_init_noise * torch.randn_like(X_purify)
 
         for ell in range(langevin_steps):
             energy = self.EBM(X_purify).sum() / langevin_temp
-            grad = torch.autograd.grad(energy, [X_purify], create_graph=requires_grad)[0]
-            if requires_grad:
-                X_purify = X_purify - ((langevin_eps ** 2) / 2) * grad
-                X_purify = X_purify + langevin_eps* torch.randn_like(grad)
-            else:
-                X_purify.data -= ((langevin_eps ** 2) / 2) * grad
-                X_purify.data += langevin_eps* torch.randn_like(grad)
+            grad = torch.autograd.grad(energy, [X_purify], create_graph=False)[0]
+            X_purify.data -= ((langevin_eps ** 2) / 2) * grad
+            X_purify.data += langevin_eps* torch.randn_like(grad)
             if self.device_type =='xla': xm.mark_step()
-
-        X_purify = X_purify
-
         if self.device_type =='xla': xm.mark_step()
 
         return X_purify

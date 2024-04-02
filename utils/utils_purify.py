@@ -47,12 +47,12 @@ def save_poisons(args,poison_tuple_list, poison_indices, target, data_key):
         str: The path to the saved file.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureDefense',args.dataset,'Poisons')
+    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons')
     # Create the directory if it doesn't exist
-    if args.poison_type == 'Gradient_Matching':
-        save_dir = os.path.join(args.data_dir, subfolder, 'Gradient_Matching')
+    if args.poison_type == 'GradientMatching':
+        save_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
-        save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}')
+        save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
         if args.fine_tune: bp_subpath = 'end2end-training'
         else: bp_subpath = 'linear-transfer-learning'
@@ -82,8 +82,8 @@ def get_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
     
-    if args.poison_type == 'Gradient_Matching':
-        poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/Gradient_Matching/{target_index}'))
+    if args.poison_type == 'GradientMatching':
+        poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/GradientMatching/',args.dataset,'ResNet34_250',f'{target_index}'))
 
     elif args.poison_type == 'Narcissus':
         if args.poison_mode == 'from_scratch':
@@ -94,13 +94,13 @@ def get_poisons(args,target_index):
             if args.dataset == 'stl10':
                 # Map stl classes to cifar classes
                 stl_cifar_label_map = {0: 0, 1: 2, 2: 1, 3: 3, 4: 4, 5: 5, 6: 7, 7: 6, 8: 8, 9: 9}
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
+                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
             else:
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
         elif args.poison_mode == 'transfer':
-            poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list=None, transfer_subset=True)
     elif args.poison_type == 'BullseyePolytope':
 
@@ -168,7 +168,7 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
         elif dataset == 'cinic10':
             base_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'CINIC-10/valid'))
             train_labels = np.array(base_dataset.targets)
-        elif dataset == 'stl10':
+        elif dataset in ['stl10', 'stl10_64']:
             base_dataset = torchvision.datasets.STL10(root=data_dir, split='train', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
             train_labels = np.array(base_dataset.labels)
         
@@ -178,6 +178,8 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
     # If the dataset is STL-10, resize the poison patches to 96x96
     if dataset == 'stl10':
         best_noise = F.interpolate(best_noise, size=(96, 96), mode='bilinear', align_corners=False)
+    elif dataset == 'stl10_64':
+        best_noise = F.interpolate(best_noise, size=(64, 64), mode='bilinear', align_corners=False)
     
     train_target_list = np.where(train_labels == label)[0]
     
@@ -191,9 +193,13 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
         # print(f"Poisoning {poison_amount} images from random selection")
         train_target_list = np.random.choice(train_target_list, poison_amount, replace=False)
 
-        
-    forward_transform = transforms.Compose([transforms.ToTensor(), 
+    
+    if dataset == 'stl10_64':
+        forward_transform = transforms.Compose([transforms.Resize((64, 64)), transforms.ToTensor(), 
                                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    else:
+        forward_transform = transforms.Compose([transforms.ToTensor(), 
+                                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     inverse_transform = transforms.Compose([transforms.Normalize((-1, -1, -1), (2, 2, 2)), 
                                             transforms.ToPILImage()])
     
@@ -257,7 +263,7 @@ def process_args(args, rank):
     Function to process the arguments for distributed training
     '''
     # List of argument names to process
-    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_train_steps', 'diff_purify_steps', 'diff_eta','ebm_name','diff_name','ebm_nf','diff_nf']
+    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_train_steps', 'diff_purify_steps', 'diff_eta','ebm_name','diff_name','ebm_nf','diff_nf','num_images_narcissus']
 
     for arg_name in arg_names:
         arg_value = getattr(args, arg_name)
@@ -276,3 +282,64 @@ def process_args(args, rank):
             return None
 
     return args
+
+######################
+# NGT Attack Dataset #
+######################
+
+# cifar_transform = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.RandomCrop(32, padding=4),
+#     transforms.RandomHorizontalFlip(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((cifar_mean), (cifar_std)),
+# ])
+
+# cifar_transform_test = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((cifar_mean), (cifar_std)),
+# ])
+
+cifar_transform_purify = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.ToTensor(),
+    # transforms.Normalize((cifar_mean), (cifar_std)),
+])
+
+class AdvDataSet(torch.utils.data.Dataset):
+    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
+        self.img_labels = np.argmax(np.load(annotations_file),axis=1)
+        self.transform = transform
+        self.target_transform = target_transform
+        # self.dataset = np.load(img_dir)
+        self.dataset = np.uint8(np.load(img_dir)*255)
+        
+
+    def __len__(self):
+        return len(self.img_labels)
+
+    def __getitem__(self, idx):
+        image = self.dataset[idx]
+        label = self.img_labels[idx]
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label   
+
+
+def get_ngt(data_root,train=True,transform=transforms.Compose([transforms.ToTensor()]),jpeg=None):
+
+    if train:
+        if jpeg is None:
+            x_train = os.path.join(data_root, 'x_train_cifar10_ntga_cnn_best.npy')
+        else:
+            x_train = os.path.join(data_root, f'x_train_cifar10_ntga_cnn_best_jpeg_compressed_{jpeg}.npy')
+        y_train = os.path.join(data_root, 'y_train_cifar10.npy')
+        dataset = AdvDataSet(y_train,x_train,transform=transform)
+    else:
+        x_test = os.path.join(data_root, 'x_val_cifar10.npy')
+        y_test = os.path.join(data_root, 'y_val_cifar10.npy')
+        dataset = AdvDataSet(y_test,x_test,transform=transform)
+
+    return dataset

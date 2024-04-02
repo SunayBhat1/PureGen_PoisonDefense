@@ -10,7 +10,8 @@ except: pass
 
 from utils.utils import *
 
-from utils.utils_purify import get_poisons, ImageListDataset, save_poisons, process_args
+from utils.utils_purify import get_poisons, ImageListDataset, save_poisons, process_args, get_ngt
+# from utils.utils_ngt import get_ngt
 
 
 ### Main Function ###
@@ -21,19 +22,45 @@ def main(rank, args):
     set_seed(args.seed, device, args.device_type)
 
     # Process the arguments for each rank
-    args = process_args(args,rank)
+    # args = process_args(args,rank)
+
+    if rank == 0:
+        args.jpeg = 85
+        args.ebm_lang_steps = 1500
+    elif rank == 1:
+        args.jpeg = 25
+        args.ebm_lang_steps = 1250
+    elif rank == 2:
+        args.jpeg = 50
+        args.ebm_lang_steps = 1250
+    elif rank == 3:
+        args.jpeg = 75
+        args.ebm_lang_steps = 1250
+    elif rank == 4:
+        args.jpeg = 85
+        args.ebm_lang_steps = 1250
+    elif rank == 5:
+        # args.jpeg = 85
+        args.ebm_lang_steps = 1250
+    elif rank == 6:
+        # args.jpeg = 75
+        args.ebm_lang_steps = 750
+    elif rank == 7:
+        args.jpeg = 85
+        args.ebm_lang_steps = 1750
+
     if args is None:
         xm.rendezvous('training end!')
         return
     
     # Get the data loader and number of target indices
-    if args.poison_type is None:
+    if args.poison_type in [None,'NGT']:
         target_indices = 1
         purify_pbar = True
     else:
         if args.poison_type == 'Narcissus':
             target_indices = 10
-        elif args.poison_type == 'Gradient_Matching':
+        elif args.poison_type == 'GradientMatching':
             target_indices = 100
         elif args.poison_type == 'BullseyePolytope':
             if args.num_images_bp == 50:
@@ -46,9 +73,9 @@ def main(rank, args):
         purify_pbar = False
 
     # Get diff and ebm model paths
-    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'models',args.ebm_model,args.dataset,args.ebm_name+'.pt')
+    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'PureGen_Models',args.ebm_model,args.ebm_name+'.pt')
     else: ebm_path = None
-    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'models',args.diff_model,args.dataset,args.diff_name+'.pt')
+    if args.diff_model is not None: diff_path = os.path.join(args.data_dir,'PureGen_Models',args.diff_model,args.diff_name+'.pt')
     else: diff_path = None
 
     # Create the PureDefense object
@@ -72,6 +99,15 @@ def main(rank, args):
             elif args.dataset == 'stl10':
                 train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.ToTensor())
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+            elif args.dataset == 'stl10_64':
+                train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.Compose([torchvision.transforms.Resize(64),torchvision.transforms.ToTensor()]))
+                train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+            elif args.dataset == 'tinyimagenet':
+                train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=torchvision.transforms.ToTensor())
+                train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+        elif args.poison_type == 'NGT':
+            train_data = get_ngt(os.path.join(args.data_dir,'NGT'),True, transform=torchvision.transforms.ToTensor(),jpeg=args.jpeg)
+            train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)
             train_loader = torch.utils.data.DataLoader(ImageListDataset(poison_tuple_list), batch_size=128, shuffle=False, num_workers=4)
@@ -85,19 +121,26 @@ def main(rank, args):
         ### Save the purified data ###
         data_key = ''
         if args.ebm_lang_steps > 0 and args.ebm_model is not None:
-            data_key += f'{args.ebm_model}[{args.ebm_name}_nf{args.ebm_nf}]_{args.ebm_lang_steps}Steps_T{args.ebm_lang_temp}'
+            data_key += f'{args.ebm_model}[{args.ebm_name}]_Steps[{args.ebm_lang_steps}]_T[{args.ebm_lang_temp}]'
         if args.diff_purify_steps > 0 and args.diff_model is not None:
-            data_key += f'_{args.diff_model}[{args.diff_name}_nf{args.diff_nf}]_beta[{args.diff_train_steps}_{args.diff_schedule}]_{args.diff_purify_steps}Steps_{args.diff_eta}eta'
+            data_key += f'_{args.diff_model}[{args.diff_name}]_beta[{args.diff_train_steps}_{args.diff_schedule}]_Steps[{args.diff_purify_steps}]_eta[{args.diff_eta}]'
         if args.ebm_lang_steps > 0 and args.diff_purify_steps > 0 and args.purify_reps > 1 and args.ebm_model is not None and args.diff_model is not None:
             data_key += f'_reps{args.purify_reps}'
         
         if data_key == '':
             data_key = 'Baseline'
 
+        if args.jpeg is not None:
+            data_key += f'_compressed{args.jpeg}'
+
         if args.poison_type is None:
-            if not os.path.exists(os.path.join(args.data_dir,'PureDefense',args.dataset)):
-                os.makedirs(os.path.join(args.data_dir,'PureDefense',args.dataset))
-            torch.save(purified_data,os.path.join(args.data_dir,'PureDefense',args.dataset,f'{data_key}.pt'))
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset)):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,f'{data_key}.pt'))
+        elif args.poison_type == 'NGT':
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT')):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT'))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT',f'{data_key}.pt'))
         else:
             save_dir = save_poisons(args,purified_data, poison_indices, target_mask_label, data_key)
 
@@ -123,15 +166,15 @@ if __name__ == '__main__':
 
     ### Setup Arguments ###
     parser.add_argument('--remote_user', type=str, help='username for the remote server (TPU only, else pass in full directory args below)')
-    # parser.add_argument('--num_proc', type=int, default=8, help='number of processes for TPU')
+    parser.add_argument('--num_proc', type=int, default=1, help='number of processes for TPU')
     parser.add_argument('--device_type', default='xla', type=str, choices=['xla','cuda','cpu','mps'],help='device type to use')
     parser.add_argument('--seed', default=11, type=int,help='seed for reproducibility')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
     parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
-    parser.add_argument('--num_proc', type=int, default=1, help='number of processes for TPU')
-
+    parser.add_argument('--jpeg', default=None, type=int, help='jpeg compression quality')
+    
     ### Experiment Arguments ###
-    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
+    parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
 
     ### Purification Arguments ###
 
@@ -140,7 +183,7 @@ if __name__ == '__main__':
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
     args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'SuperLightEBM','LightEBM','EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
-    args_ebm.add_argument('--ebm_name', default='ebm_cifar10_45k', type=str_or_str_list, help='path to the EBM model including train dataset')
+    args_ebm.add_argument('--ebm_name', default='cifar10_45k_ep520_nf128', type=str_or_str_list, help='path to the EBM model including train dataset')
     args_ebm.add_argument('--ebm_nf', default=128, type=int_or_int_list,  help='number of filters for the ebm model')
     args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')
     args_ebm.add_argument('--ebm_lang_temp', default=1e-4, type=float_or_float_list, help='langevin temperature')
@@ -158,11 +201,11 @@ if __name__ == '__main__':
         
 
     ### Poison Arguments ###
-    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'Gradient_Matching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench','NGT'],help='type of poison to generate')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
-    parser.add_argument('--num_images_narcissus', default=500, type=int, help='number of poisoned images generated')
+    parser.add_argument('--num_images_narcissus', default=500, type=int_or_int_list, help='number of poisoned images generated')
     parser.add_argument('--random_imgs_narcissus', default=False, action='store_true', help='use random images for narcissus')
     parser.add_argument('--iters_bp', default=800, type=int,help='iterations for making poison')
     parser.add_argument('--num_images_bp', default=50, type=int,help='number of poisoned images generated')

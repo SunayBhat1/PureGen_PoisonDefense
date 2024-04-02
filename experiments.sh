@@ -2,34 +2,37 @@
 # Nodes Lists #
 ###############
 
-### Node1 Base: Testing HLB Integrations
+### Node1 Base: Res18_HLB NGT
 
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --no_poison --num_proc 1 --dataset 'stl10';
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
-
-
-## STL 10
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --no_poison --num_proc 1;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override ResNet18 --dataset 'stl10' --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_name 'cinic10imagenet_ep585_nf128' --diff_model None --poison_type 'NGT' --num_proc 8;
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --poison_type 'NGT' --dataset 'cifar10_NGT';
 
 
+# Baseline
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'NGT';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --poison_type 'NGT' --dataset 'cifar10_NGT';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --poison_type 'NGT' --dataset 'cifar10_NGT';
 
+# ### Node 8: Train small EBMS CINIC-10 
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
 
-### Node 8: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48;
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --batch_size 128 --num_filters 48;
-
-### Node 7: Train small EBMS CINIC-10 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM'; 
-python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64;
+# ### Node 7: Train small EBMS CINIC-10 
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --lr 1e-5 --lr_decay_milestones 25 50 75 100;
+# python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'LightEBM' --batch_size 64 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
 
 ####################
 # Purificatiion #
 ####################
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10';
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --dataset 'stl10' --num_images_narcissus 100;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --dataset 'stl10' --num_images_narcissus 100;
+
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'tinyimagenet';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'GradientMatching' --dataset 'tinyimagenet';
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --dataset 'stl10_64';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --dataset 'stl10_64' --num_images_narcissus 100;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --dataset 'stl10_64' --num_images_narcissus 100;
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None;
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_model None --poison_type 'Narcissus';
@@ -53,12 +56,14 @@ python3 purify.py --remote_user 'sunaybhat';
 ############################
 
 # Copy Poisons/Models Up to Node
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/NGT/* sunaybhat@node1:/home/sunaybhat/data/NGT/
+
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/Research/data_EBM_Defense/* sunaybhat@node1_Base:/home/sunaybhat/data/
+
 
 # Copy EBM Data down to local
 rsync -av "sunaybhat@node7:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
 rsync -av "sunaybhat@node8:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
-rsync -av "sunaybhat@node9:/home/sunaybhat/models/*" /Users/sunaybhat/Documents/GitHub/models/
 
 
 # Copy Cifar10 Split Data
@@ -68,7 +73,7 @@ scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Split.pth suna
 (
 # Clone 
 mkdir data;
-git clone https://github.com/SunayBhat1/PureDefense
+git clone https://github.com/SunayBhat1/PureGen_Defense
 # Create a data dir
 pip install tqdm;
 pip install pandas;

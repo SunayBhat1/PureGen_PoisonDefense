@@ -9,6 +9,7 @@ from torchvision.datasets import *
 import torch.utils.data as data
 from tqdm import tqdm
 import pickle
+from PIL import Image
 
 import torch.nn.functional as F
 import random
@@ -28,19 +29,26 @@ cifar_std_gm = (0.2471, 0.2435, 0.2616)
 stl10_mean = (0.4914, 0.4822, 0.4465)
 stl10_std = (0.2471, 0.2435, 0.2616)
 
+tinyimagenet_mean = (0.4802, 0.4481, 0.3975)
+tinyimagenet_std = (0.2302, 0.2265, 0.2262)
+
 # Dataset info dict
 dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
+                'cifar10_NGT':{'num_classes':10,'img_dim':32},
                 'cinic10':{'num_classes':10,'img_dim':32},
-                'tiny_imagenet':{'num_classes':200,'img_dim':64},
+                'tinyimagenet':{'num_classes':200,'img_dim':64},
                 'stl10':{'num_classes':10,'img_dim':96},
+                'stl10_64':{'num_classes':10,'img_dim':64},
                 }
 
 # dataset_info dict
 dataset_info = {'from_scratch':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 5000},
+                    'cifar10_NGT': {'num_classes': 10, 'num_per_label': 5000},
                     'cinic10': {'num_classes': 10, 'num_per_label': 9000},
-                    'tiny-imagenet': {'num_classes': 200, 'num_per_label': 500},
+                    'tinyimagenet': {'num_classes': 200, 'num_per_label': 500},
                     'stl10': {'num_classes': 10, 'num_per_label': 500},
+                    'stl10_64': {'num_classes': 10, 'num_per_label': 500},
                     },
                 'transfer':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 200},
@@ -61,7 +69,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
                 base_data = CIFAR10(args.data_dir, train=True, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=transforms.ToTensor())
             elif args.dataset == 'cinic10':
                 base_data = ImageFolder(os.path.join(args.data_dir, 'CINIC-10/train'), transform=transforms.ToTensor())
-            elif args.dataset == 'tiny-imagenet':
+            elif args.dataset == 'tinyimagenet':
                 base_data = ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=transforms.ToTensor())
             elif args.dataset == 'stl10':
                 base_data = STL10(args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transforms.ToTensor())
@@ -75,9 +83,13 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
             
         target_mask_label = None
 
+    elif args.poison_type == 'NGT':
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT',args.data_key + '.pt'))
+        base_data = Simple_Dataset_Base(base_data, transforms=transforms.Compose([transforms.ToTensor()]))
+        target_mask_label = None
     else:
 
-        base_data = torch.load(os.path.join(args.data_dir,'PureDefense',args.dataset,args.data_key + '.pt'))
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
 
         poison_tuple_list, poison_indices, target_mask_label = load_poisons(args,target_index)
 
@@ -114,7 +126,10 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
                 
     base_loader = data.DataLoader(base_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    train_data = PoisonedDataset(base_loader, poisoned = not args.no_poison, transform=train_transforms)
+    if args.poison_type == 'NGT':
+        train_data = PoisonedDataset(base_loader, poisoned = False, transform=train_transforms)
+    else:
+        train_data = PoisonedDataset(base_loader, poisoned = not args.no_poison, transform=train_transforms)
 
     if 'HLB' in args.model and args.dataset == 'cifar10':
         aug = {'flip': args.hlb_flip}
@@ -249,6 +264,27 @@ class Poisoned_Dataset_Base(data.Dataset):
             idx = self.valid_indices[index - len(self.poison_tuple_list)]
             img, label = self.img_label_list[idx]
         return self.transforms(img), label, index, p
+
+class Simple_Dataset_Base(data.Dataset):
+    def __init__(self, base_dataset, transforms):
+        """
+        Args:
+            base_dataset (Dataset): The base dataset.
+            transforms (callable): A function/transform that takes in an PIL image and returns a transformed version.
+        """
+
+        self.base_dataset = base_dataset
+        self.img_label_list = [(img, label) for img, label in base_dataset]
+        self.transforms = transforms
+        self.valid_indices = list(range(len(self.img_label_list)))
+
+    def __len__(self):
+        return len(self.valid_indices)
+
+    def __getitem__(self, index):
+        idx = self.valid_indices[index]
+        img, label = self.img_label_list[idx]
+        return self.transforms(img), label
 
 class PoisonedDataset_Bench(data.Dataset):
     def __init__(
@@ -394,21 +430,79 @@ class CifarLoader:
             else:
                 yield (images[idxs], self.labels[idxs])
 
+
 ###################
 # Test Data Utils #
 ###################
                 
 def get_test_dataset(args, transform):
-    if args.dataset == 'cifar10':
+    if args.dataset == 'cifar10' or args.dataset == 'cifar10_NGT':
         test_data = CIFAR10(args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=transform)
     elif args.dataset == 'cinic10':
         test_data = ImageFolder(os.path.join(args.data_dir, 'CINIC-10/test'), transform=transform)
-    elif args.dataset == 'tiny-imagenet':
-        test_data = ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/test'), transform=transform)
+    elif args.dataset == 'tinyimagenet':
+        test_data = TinyImageNetValDataset(os.path.join(args.data_dir, 'tiny-imagenet-200'), transform=transform)
     elif args.dataset == 'stl10':
         test_data = STL10(args.data_dir, split='test', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transform)
+    elif args.dataset == 'stl10_64':
+        test_data = STL10(args.data_dir, split='test', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transform)
+    else:
+        raise Exception(f"Dataset {args.dataset} not supported in function get_test_dataset")
 
     return test_data
+
+
+class TinyImageNetValDataset(data.Dataset):
+    def __init__(self, tiny_imagenet_folder, transform=None):
+        """
+        Initializes the dataset loader for the Tiny ImageNet validation set.
+        
+        Args:
+            tiny_imagenet_folder (string): Directory with all the Tiny ImageNet dataset, including 'val' folder.
+            transform (callable, optional): Optional transform to be applied on a sample.
+        """
+        
+        self.tiny_imagenet_folder = tiny_imagenet_folder
+        self.transform = transform
+
+        # Load class indices
+        self.classes = sorted(item for item in os.listdir(os.path.join(tiny_imagenet_folder, 'train')) if item != '.DS_Store')
+        self.class_to_idx = {cls_name: i for i, cls_name in enumerate(self.classes)}
+
+        # Load image paths and labels
+        self.image_paths, self.labels = self._load_labels_from_file(os.path.join(tiny_imagenet_folder, 'val', 'val_annotations.txt'))
+
+    def _load_labels_from_file(self, labels_file):
+        """
+        Loads image paths and labels from the val_annotations.txt file.
+        
+        Args: labels_file (string): Path to the val_annotations.txt file.
+        Returns: tuple: A tuple containing lists of image paths and their corresponding labels.
+        """
+        label_data = []
+        with open(labels_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                # Append the image path and class name
+                label_data.append((parts[0], parts[1]))
+
+        # Replace class names with indices and form full paths
+        labels = [self.class_to_idx[class_name] for _, class_name in label_data]
+        image_paths = [os.path.join(self.tiny_imagenet_folder, 'val', 'images', path) for path, _ in label_data]
+        return image_paths, labels
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        image_path = self.image_paths[idx]
+        image = Image.open(image_path).convert('RGB')
+
+        if self.transform:
+            image = self.transform(image)
+
+        label = self.labels[idx]
+        return image, label
 
 def apply_noise_patch(noise,images,offset_x=0,offset_y=0,mode='change',padding=20,position='fixed'):
     '''
@@ -518,6 +612,16 @@ def batch_cutout(inputs, size):
 #############
     
 def get_train_transforms(args):
+    if args.poison_type == 'NGT':
+
+        train_transforms = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((cifar_mean), (cifar_std)),
+            ])
+        
+        return train_transforms
     if args.poison_mode == 'from_scratch' or args.poison_type in ['BullseyePolytope_Bench','Narcissus']:
         if args.dataset in ['cifar10','cinic10']:
             train_transforms = [transforms.RandomCrop(32, padding=4),
@@ -527,7 +631,11 @@ def get_train_transforms(args):
             train_transforms = [transforms.RandomCrop(96, padding=4),
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
-        elif args.dataset == 'tiny-imagenet':
+        elif args.dataset == 'stl10_64':
+            train_transforms = [transforms.RandomCrop(64, padding=4),
+                                                transforms.RandomHorizontalFlip(),
+                                                transforms.ToTensor()]
+        elif args.dataset == 'tinyimagenet':
             train_transforms = [transforms.RandomCrop(64, padding=4),
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
@@ -558,13 +666,18 @@ def get_train_transforms(args):
             train_transforms.append(transforms.Normalize(cifar_mean_gm, cifar_std_gm))
         elif args.dataset == 'cinic10':
             train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
-        elif args.dataset == 'stl10':
+        elif args.dataset in ['stl10','stl10_64']:
             train_transforms.append(transforms.Normalize(stl10_mean, stl10_std))
+        elif args.dataset == 'tinyimagenet':
+            train_transforms.append(transforms.Normalize(tinyimagenet_mean, tinyimagenet_std))
+        else:
+            raise Exception(f"Dataset {args.dataset} transforms not supported for from_scratch poison mode")
     elif args.poison_mode == 'transfer':
         train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
 
     if args.baseline_defense == 'Friendly' or args.aug_rand_transforms:
-        train_transforms.append(RandomTransform(**dict(source_size=32, target_size=32, shift=8, fliplr=True), mode='bilinear'))
+        img_size = dataset_dict[args.dataset]['img_dim']
+        train_transforms.append(RandomTransform(**dict(source_size=img_size, target_size=img_size, shift=8, fliplr=True), mode='bilinear'))
 
     if args.aug_cutout:
         train_transforms.append(Cutout(n_holes=8, length=8))
@@ -808,12 +921,12 @@ def load_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureDefense',args.dataset,'Poisons')
+    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons')
 
-    if args.poison_type == 'Gradient_Matching':
-        load_dir = os.path.join(args.data_dir, subfolder, 'Gradient_Matching')
+    if args.poison_type == 'GradientMatching':
+        load_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
-        load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}')
+        load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
         if args.fine_tune: bp_subpath = 'end2end-training'
         else: bp_subpath = 'linear-transfer-learning'
@@ -830,8 +943,8 @@ def load_poisons(args,target_index):
     
 
 def get_poisons_target(args,target_index,test_transforms,target_mask=None):
-    if args.poison_type =='Gradient_Matching':
-        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'Poisons/Gradient_Matching/{target_index}'), test_transforms)
+    if args.poison_type =='GradientMatching':
+        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'PoisonDefense/Poisons/GradientMatching/{args.dataset}/ResNet34_250/{target_index}'), test_transforms)
         return target_img, target_orig_label
     
     elif args.poison_type == 'BullseyePolytope':
@@ -839,7 +952,7 @@ def get_poisons_target(args,target_index,test_transforms,target_mask=None):
         return target_img, 6
     
     elif args.poison_type == 'BullseyePolytope_Bench':
-        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}'), test_transforms)
+        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'PoisonDefense/Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}'), test_transforms)
         return target_img, target_orig_label
 
     elif args.poison_type == 'Narcissus':
@@ -863,7 +976,7 @@ def get_target_narcissus(data_dir, dataset, poison, label, transform_test, multi
     elif dataset == 'tiny-imagenet':
         test_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'tiny-imagenet-200/test'))
         test_labels = np.array(test_dataset.targets)
-    elif dataset == 'stl10':
+    elif dataset in ['stl10','stl10_64']:
         test_dataset = torchvision.datasets.STL10(root=data_dir, split='test', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
         test_labels = np.array(test_dataset.labels)
     else:
