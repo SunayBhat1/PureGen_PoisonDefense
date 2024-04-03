@@ -5,7 +5,7 @@
 ### Node1 Base: Res18_HLB NGT
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_name 'cinic10imagenet_ep585_nf128' --diff_model None --poison_type 'NGT' --num_proc 8;
-python3 train_classifier.py --remote_user 'sunaybhat' --config_override R18_HLB --poison_type 'NGT' --dataset 'cifar10_NGT';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override HLB_LARGE --poison_type 'NGT' --dataset 'cifar10_NGT';
 
 
 # Baseline

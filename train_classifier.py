@@ -26,14 +26,18 @@ from utils.SMD_opt import *
 
 def main(rank, args):
 
-    if rank == 0: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[300]_T[0.0001]'
-    elif rank == 1: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[1500]_T[0.0001]_compressed50'
-    elif rank == 2: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[500]_T[0.0001]_compressed75'
-    elif rank == 3: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[500]_T[0.0001]_compressed85'
-    elif rank == 4: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[600]_T[0.0001]'
-    elif rank == 5: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[1500]_T[0.0001]_compressed75'
-    elif rank == 6: target_index = None
-    elif rank == 7: target_index = None
+    if rank == 0: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[700]_T[0.000105]_compressed85'
+    elif rank == 1: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[800]_T[0.000105]_compressed85'
+    elif rank == 2: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[700]_T[0.00011]_compressed85'
+    elif rank == 3: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[800]_T[0.00011]_compressed85'
+    elif rank == 4: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[700]_T[9.99e-05]_compressed85'
+    elif rank == 5: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[800]_T[9.99e-05]_compressed85'
+    elif rank == 6: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[700]_T[9.9e-05]_compressed85'
+    elif rank == 7: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[800]_T[9.9e-05]_compressed85'
+
+    if args is None:
+        xm.rendezvous('training end!')
+        return
 
     ##############################
     # Setup

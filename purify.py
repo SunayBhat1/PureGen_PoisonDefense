@@ -25,29 +25,29 @@ def main(rank, args):
     # args = process_args(args,rank)
 
     if rank == 0:
-        args.jpeg = 85
-        args.ebm_lang_steps = 1500
+        args.ebm_lang_steps = 700
+        args.ebm_lang_temp = 1.05e-4
     elif rank == 1:
-        args.jpeg = 25
-        args.ebm_lang_steps = 1250
+        args.ebm_lang_steps = 800
+        args.ebm_lang_temp = 1.05e-4
     elif rank == 2:
-        args.jpeg = 50
-        args.ebm_lang_steps = 1250
+        args.ebm_lang_steps = 700
+        args.ebm_lang_temp = 1.1e-4
     elif rank == 3:
-        args.jpeg = 75
-        args.ebm_lang_steps = 1250
+        args.ebm_lang_steps = 700
+        args.ebm_lang_temp = 9.99e-5
     elif rank == 4:
-        args.jpeg = 85
-        args.ebm_lang_steps = 1250
+        args.ebm_lang_steps = 800
+        args.ebm_lang_temp = 9.99e-5
     elif rank == 5:
-        # args.jpeg = 85
-        args.ebm_lang_steps = 1250
+        args.ebm_lang_steps = 700
+        args.ebm_lang_temp = 9.9e-5
     elif rank == 6:
-        # args.jpeg = 75
-        args.ebm_lang_steps = 750
+        args.ebm_lang_steps = 800
+        args.ebm_lang_temp = 1.1e-4
     elif rank == 7:
-        args.jpeg = 85
-        args.ebm_lang_steps = 1750
+        args.ebm_lang_steps = 800
+        args.ebm_lang_temp = 9.9e-5
 
     if args is None:
         xm.rendezvous('training end!')
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=11, type=int,help='seed for reproducibility')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
     parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
-    parser.add_argument('--jpeg', default=None, type=int, help='jpeg compression quality')
+    parser.add_argument('--jpeg', default=85, type=int, help='jpeg compression quality')
     
     ### Experiment Arguments ###
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
@@ -185,7 +185,7 @@ if __name__ == '__main__':
     args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'SuperLightEBM','LightEBM','EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
     args_ebm.add_argument('--ebm_name', default='cifar10_45k_ep520_nf128', type=str_or_str_list, help='path to the EBM model including train dataset')
     args_ebm.add_argument('--ebm_nf', default=128, type=int_or_int_list,  help='number of filters for the ebm model')
-    args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')
+    args_ebm.add_argument('--ebm_lang_steps', default=750, type=int_or_int_list, help='number of langevin steps')
     args_ebm.add_argument('--ebm_lang_temp', default=1e-4, type=float_or_float_list, help='langevin temperature')
 
     # Diffusion Arguments
