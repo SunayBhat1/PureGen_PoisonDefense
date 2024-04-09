@@ -6,10 +6,122 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
 """
 Floating point conversion.
 """
+
+def create_diffusion_model(model_name, in_channels, out_channels, **kwargs):
+    if model_name == "UNET_SMALL":
+        return SmallUNetAttention(in_channels, out_channels, **kwargs)
+    else:
+        raise ValueError(f"Invalid model name: {model_name}")
+
+##########################
+# Small U-Net Diff Model #
+##########################
+
+class SmallUNetAttention(nn.Module):
+    def __init__(self, in_channels, out_channels, time_emb_dim=64, num_res_blocks=2, nf=64, num_heads=4):
+        super(SmallUNetAttention, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.time_emb_dim = time_emb_dim
+        self.num_res_blocks = num_res_blocks
+        self.nf = nf
+        self.num_heads = num_heads
+
+        self.time_mlp = nn.Sequential(
+            nn.Linear(time_emb_dim, nf),
+            nn.ReLU(),
+            nn.Linear(nf, nf),
+        )
+
+        self.input_conv = nn.Conv2d(in_channels, nf, kernel_size=3, padding=1)
+
+        self.down1 = self._make_res_block(nf, nf * 2, stride=2)
+        self.attn1 = AttentionBlock(nf * 2, num_heads)
+        self.down2 = self._make_res_block(nf * 2, nf * 4, stride=2)
+        self.attn2 = AttentionBlock(nf * 4, num_heads)
+
+        self.mid_block = nn.ModuleList([
+            self._make_res_block(nf * 4, nf * 4) for _ in range(num_res_blocks)
+        ])
+
+        self.up1 = self._make_res_block(nf * 8, nf * 2, stride=2, transpose=True)
+        self.attn3 = AttentionBlock(nf * 2, num_heads)
+        self.up2 = self._make_res_block(nf * 4, nf, stride=2, transpose=True)
+        self.attn4 = AttentionBlock(nf, num_heads)
+
+        self.output_conv = nn.Conv2d(nf * 2, out_channels, kernel_size=1)
+
+    def _make_res_block(self, in_channels, out_channels, stride=1, transpose=False):
+        if transpose:
+            conv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, output_padding=1)
+        else:
+            conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+
+        return nn.Sequential(
+            conv,
+            nn.GroupNorm(8, out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.GroupNorm(8, out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x_in, t):
+        t_emb = self.time_mlp(t)
+        x = self.input_conv(x_in)
+        skip_connections = []
+
+        x = self.down1(x + t_emb.view(-1, self.nf, 1, 1))  # Add time embedding to the input
+        x = self.attn1(x)
+        skip_connections.append(x)
+        x = self.down2(x)
+        x = self.attn2(x)
+        skip_connections.append(x)
+
+        for block in self.mid_block:
+            x = block(x + t_emb.repeat(1,4).view(-1, self.nf * 4, 1, 1))  # Add time embedding to the middle blocks
+
+        x = torch.cat([x, skip_connections.pop()], dim=1)
+        x = self.up1(x)
+        x = self.attn3(x)
+        x = torch.cat([x, skip_connections.pop()], dim=1)  # Concatenate skip connection
+        x = self.up2(x)
+        x = self.attn4(x)
+
+        x = torch.cat([x, self.input_conv(x_in)], dim=1)  # Concatenate input
+        x = self.output_conv(x)
+
+        return x
+
+class AttentionBlock(nn.Module):
+    def __init__(self, channels, num_heads=4):
+        super(AttentionBlock, self).__init__()
+        self.norm = nn.GroupNorm(8, channels)
+        self.q = nn.Conv2d(channels, channels, kernel_size=1, bias=False)
+        self.k = nn.Conv2d(channels, channels, kernel_size=1, bias=False)
+        self.v = nn.Conv2d(channels, channels, kernel_size=1, bias=False)
+        self.proj_out = nn.Conv2d(channels, channels, kernel_size=1)
+        self.num_heads = num_heads
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        q = self.q(x).view(b, self.num_heads, c // self.num_heads, h * w).permute(0, 1, 3, 2)
+        k = self.k(x).view(b, self.num_heads, c // self.num_heads, h * w)
+        v = self.v(x).view(b, self.num_heads, c // self.num_heads, h * w).permute(0, 1, 3, 2)
+
+        attn = torch.matmul(q, k) * (c ** (-0.5))
+        attn = torch.softmax(attn, dim=-1)
+
+        out = torch.matmul(attn, v)
+        out = out.permute(0, 1, 3, 2).contiguous().view(b, c, h, w)
+        out = self.proj_out(out)
+
+        return out
 
 def create_diff(net_type, im_sz, nf, channel_mult=(1,2,2,2), dummy_batch_size=4):
     if net_type == 'DDPM_UNET':
@@ -456,53 +568,53 @@ class ResBlock(TimestepBlock):
         return self.skip_connection(x) + h
 
 
-class AttentionBlock(nn.Module):
-    """
-    An attention block that allows spatial positions to attend to each other.
+# class AttentionBlock(nn.Module):
+#     """
+#     An attention block that allows spatial positions to attend to each other.
 
-    Originally ported from here, but adapted to the N-d case.
-    https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/models/unet.py#L66.
-    """
+#     Originally ported from here, but adapted to the N-d case.
+#     https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/models/unet.py#L66.
+#     """
 
-    def __init__(
-        self,
-        channels,
-        num_heads=1,
-        num_head_channels=-1,
-        use_checkpoint=False,
-        use_new_attention_order=False,
-    ):
-        super().__init__()
-        self.channels = channels
-        if num_head_channels == -1:
-            self.num_heads = num_heads
-        else:
-            assert (
-                channels % num_head_channels == 0
-            ), f"q,k,v channels {channels} is not divisible by num_head_channels {num_head_channels}"
-            self.num_heads = channels // num_head_channels
-        self.use_checkpoint = use_checkpoint
-        self.norm = normalization(channels)
-        self.qkv = conv_nd(1, channels, channels * 3, 1)
-        if use_new_attention_order:
-            # split qkv before split heads
-            self.attention = QKVAttention(self.num_heads)
-        else:
-            # split heads before split qkv
-            self.attention = QKVAttentionLegacy(self.num_heads)
+#     def __init__(
+#         self,
+#         channels,
+#         num_heads=1,
+#         num_head_channels=-1,
+#         use_checkpoint=False,
+#         use_new_attention_order=False,
+#     ):
+#         super().__init__()
+#         self.channels = channels
+#         if num_head_channels == -1:
+#             self.num_heads = num_heads
+#         else:
+#             assert (
+#                 channels % num_head_channels == 0
+#             ), f"q,k,v channels {channels} is not divisible by num_head_channels {num_head_channels}"
+#             self.num_heads = channels // num_head_channels
+#         self.use_checkpoint = use_checkpoint
+#         self.norm = normalization(channels)
+#         self.qkv = conv_nd(1, channels, channels * 3, 1)
+#         if use_new_attention_order:
+#             # split qkv before split heads
+#             self.attention = QKVAttention(self.num_heads)
+#         else:
+#             # split heads before split qkv
+#             self.attention = QKVAttentionLegacy(self.num_heads)
 
-        self.proj_out = zero_module(conv_nd(1, channels, channels, 1))
+#         self.proj_out = zero_module(conv_nd(1, channels, channels, 1))
 
-    def forward(self, x):
-        return checkpoint(self._forward, (x,), self.parameters(), True)
+#     def forward(self, x):
+#         return checkpoint(self._forward, (x,), self.parameters(), True)
 
-    def _forward(self, x):
-        b, c, *spatial = x.shape
-        x = x.reshape(b, c, -1)
-        qkv = self.qkv(self.norm(x))
-        h = self.attention(qkv)
-        h = self.proj_out(h)
-        return (x + h).reshape(b, c, *spatial)
+#     def _forward(self, x):
+#         b, c, *spatial = x.shape
+#         x = x.reshape(b, c, -1)
+#         qkv = self.qkv(self.norm(x))
+#         h = self.attention(qkv)
+#         h = self.proj_out(h)
+#         return (x + h).reshape(b, c, *spatial)
 
 
 def count_flops_attn(model, _x, y):

@@ -11,7 +11,6 @@ except: pass
 from utils.utils import *
 
 from utils.utils_purify import get_poisons, ImageListDataset, save_poisons, process_args, get_ngt
-# from utils.utils_ngt import get_ngt
 
 
 ### Main Function ###
@@ -22,37 +21,8 @@ def main(rank, args):
     set_seed(args.seed, device, args.device_type)
 
     # Process the arguments for each rank
-    # args = process_args(args,rank)
+    args = process_args(args,rank)
 
-    if rank == 0:
-        args.jpeg = 85
-        args.ebm_lang_steps = 1500
-    elif rank == 1:
-        args.jpeg = 25
-        args.ebm_lang_steps = 1250
-    elif rank == 2:
-        args.jpeg = 50
-        args.ebm_lang_steps = 1250
-    elif rank == 3:
-        args.jpeg = 75
-        args.ebm_lang_steps = 1250
-    elif rank == 4:
-        args.jpeg = 85
-        args.ebm_lang_steps = 1250
-    elif rank == 5:
-        # args.jpeg = 85
-        args.ebm_lang_steps = 1250
-    elif rank == 6:
-        # args.jpeg = 75
-        args.ebm_lang_steps = 750
-    elif rank == 7:
-        args.jpeg = 85
-        args.ebm_lang_steps = 1750
-
-    if args is None:
-        xm.rendezvous('training end!')
-        return
-    
     # Get the data loader and number of target indices
     if args.poison_type in [None,'NGT']:
         target_indices = 1
@@ -82,9 +52,8 @@ def main(rank, args):
     PurifyClass = PureDefense(device,args.device_type,
                             ebm_type=args.ebm_model,ebm_path=ebm_path,ebm_nf=args.ebm_nf,
                             diff_type=args.diff_model,diff_path=diff_path,diff_nf=args.diff_nf,
-                            diff_schedule=args.diff_schedule,
-                            diff_train_steps=args.diff_train_steps,diff_output=args.diff_output,
-                            img_sz=32,verbose=args.verbose)
+                            time_emb_dim=args.diff_time_emb_dim,num_res_blocks=args.num_res_blocks,
+                            verbose=args.verbose)
     
     if purify_pbar is False and rank == 0:
         pbar = tqdm(total=target_indices, desc='Purifying Poisoned Data')
@@ -114,17 +83,17 @@ def main(rank, args):
 
         ### Purify the dataset ###
         purified_data = PurifyClass.purify(train_loader,ebm_lang_steps=args.ebm_lang_steps,ebm_lang_temp=args.ebm_lang_temp,
-                        diff_steps=args.diff_purify_steps, diff_eta=args.diff_eta,
-                        purify_reps=1,pbar=purify_pbar)
+                        diff_steps=args.diff_T,
+                        purify_reps=args.purify_reps,pbar=purify_pbar)
         
 
         ### Save the purified data ###
         data_key = ''
         if args.ebm_lang_steps > 0 and args.ebm_model is not None:
             data_key += f'{args.ebm_model}[{args.ebm_name}]_Steps[{args.ebm_lang_steps}]_T[{args.ebm_lang_temp}]'
-        if args.diff_purify_steps > 0 and args.diff_model is not None:
-            data_key += f'_{args.diff_model}[{args.diff_name}]_beta[{args.diff_train_steps}_{args.diff_schedule}]_Steps[{args.diff_purify_steps}]_eta[{args.diff_eta}]'
-        if args.ebm_lang_steps > 0 and args.diff_purify_steps > 0 and args.purify_reps > 1 and args.ebm_model is not None and args.diff_model is not None:
+        if args.diff_T > 0 and args.diff_model is not None:
+            data_key += f'_{args.diff_model}[{args.diff_name}]_T[{args.diff_T}]'
+        if args.purify_reps > 1:
             data_key += f'_reps{args.purify_reps}'
         
         if data_key == '':
@@ -182,22 +151,26 @@ if __name__ == '__main__':
 
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
-    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'SuperLightEBM','LightEBM','EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
-    args_ebm.add_argument('--ebm_name', default='cifar10_45k_ep520_nf128', type=str_or_str_list, help='path to the EBM model including train dataset')
-    args_ebm.add_argument('--ebm_nf', default=128, type=int_or_int_list,  help='number of filters for the ebm model')
+    args_ebm.add_argument('--ebm_model', default='EBM', type=none_or_str, choices=[None,'SuperLightEBM','LightEBM','EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
+    args_ebm.add_argument('--ebm_name', default='cinic10_imagenet_ep120_nf32', type=str_or_str_list, help='path to the EBM model including train dataset')
+    args_ebm.add_argument('--ebm_nf', default=32, type=int_or_int_list,  help='number of filters for the ebm model')
     args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')
     args_ebm.add_argument('--ebm_lang_temp', default=1e-4, type=float_or_float_list, help='langevin temperature')
 
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
-    args_diff.add_argument('--diff_model', default='DDPM_UNET_EBM', type=none_or_str, choices=[None, 'DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
-    args_diff.add_argument('--diff_name', default='mcmc_steps1600_bank_fixer_cosine', type=str_or_str_list, help='path to the diffusion model')
-    args_diff.add_argument('--diff_nf', default=128, type=int_or_int_list,  help='number of filters for the unet model')
-    args_diff.add_argument('--diff_train_steps', default=1000, type=int_or_int_list, help='training t-steps for diffuion model')
-    args_diff.add_argument('--diff_output', default='epsilon', type=str, choices=['epsilon','start_x'],  help='diffusion model output')
-    args_diff.add_argument('--diff_schedule', default='cosine', type=str, choices=['linear','cosine'], help='t schedule')
-    args_diff.add_argument('--diff_purify_steps', default=10, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
-    args_diff.add_argument('--diff_eta', default=0, type=int_or_int_list,  help='ddpm 1 or ddim 0 for the sampling of the 1000 tstep fixer')
+    args_diff.add_argument('--diff_model', default='UNET_SMALL', type=none_or_str, choices=[None, 'DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
+    args_diff.add_argument('--diff_name', default='cifar10_ep120_nf64_EBM[cinic10_imagenet_ep120_nf32]', type=str_or_str_list, help='path to the diffusion model')
+    args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
+    args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')
+    args_diff.add_argument('--num_res_blocks', default=2, type=int, help='number of res blocks in the unet')
+    args_diff.add_argument('--diff_T', default=150, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
+
+
+    # args_diff.add_argument('--diff_train_steps', default=1000, type=int_or_int_list, help='training t-steps for diffuion model')
+    # args_diff.add_argument('--diff_output', default='epsilon', type=str, choices=['epsilon','start_x'],  help='diffusion model output')
+    # args_diff.add_argument('--diff_schedule', default='cosine', type=str, choices=['linear','cosine'], help='t schedule')
+    # args_diff.add_argument('--diff_eta', default=0, type=int_or_int_list,  help='ddpm 1 or ddim 0 for the sampling of the 1000 tstep fixer')
         
 
     ### Poison Arguments ###
@@ -216,10 +189,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Raise errors
-    if args.purify_reps > 1 and (args.ebm_type is None or args.diff_type is None):
+    if args.purify_reps > 1 and (args.ebm_model is None or args.diff_model is None):
         raise ValueError('When purify_reps>1, both EBM and Diffusion models must be provided')
-    if args.purify_reps > 1 and (args.ebm_lang_steps == 0 or args.diff_purify_steps == 0):
-        raise ValueError('When purify_reps>1, ebm_lang_steps and diff_purify_steps must be greater than 0')
+    if args.purify_reps > 1 and (args.ebm_lang_steps == 0 or args.diff_T == 0):
+        raise ValueError('When purify_reps>1, ebm_lang_steps and diff_T must be greater than 0')
     
     # Print the arguments
     if args.verbose:

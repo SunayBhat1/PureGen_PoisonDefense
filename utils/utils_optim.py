@@ -1,13 +1,19 @@
 import torch
-import torch.nn as nn
 from torch.optim import Optimizer
 import torch.distributed as dist
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors, \
     _take_tensors
 import math
 
+import torch
+from torch import Tensor
+from torch.optim.optimizer import (Optimizer, _use_grad_for_differentiable, _get_value, _dispatch_sqrt,
+                        _stack_if_compiling, _capturable_doc, _differentiable_doc, _foreach_doc,
+                        _fused_doc, _maximize_doc, _default_to_fused_or_foreach)
+from typing import List, Optional
+from torch.utils._foreach_utils import _group_tensors_by_device_and_dtype
 
-## SMD optimizers
+
 
 class SMD_compress(Optimizer):
 
@@ -24,7 +30,7 @@ class SMD_compress(Optimizer):
     
     def __setstate__(self, state):
         super(SMD_compress, self).__setstate__(state)
-    
+     
     def step(self, closure=None):
         loss = None
         if closure is not None:
@@ -117,152 +123,17 @@ class SMD_qnorm(Optimizer):
                 
 
         return loss
-    
-    
-# RMD Loss
-
-class RMD_Loss(nn.Module):
-    def __init__(self, sample_loss_func, num_datapoints, device, reduction='mean'):
-        super(RMD_Loss, self).__init__()
-        self.sample_loss_func = sample_loss_func
-        self.z = torch.zeros(num_datapoints,device=device)
-        self.idx = 0
-        self.reduction = reduction
-    
-    def set_z_values(self, z, idx):
-        self.z = z
-        self.idx = idx
-
-    def forward(self, predictions, target):
-        # sample_loss = self.sample_loss_func(predictions, target)
-
-        # adjusted_sample_loss = torch.sqrt(2 * self.sample_loss_func(predictions, target))
-
-        # squared_loss = 0.5 * torch.square(self.z[self.idx] - adjusted_sample_loss)
-        squared_loss = 0.5 * torch.square(self.z[self.idx] - torch.sqrt(2 * self.sample_loss_func(predictions, target)))
-        if self.reduction == 'mean':
-            return torch.mean(squared_loss)
-        elif self.reduction == 'sum':
-            return torch.sum(squared_loss)
-        else:
-            return squared_loss
-
-class RMD_Loss_Cores(nn.Module):
-    def __init__(self, sample_loss_func, num_datapoints, device, reduction='mean'):
-        super(RMD_Loss_Cores, self).__init__()
-        self.sample_loss_func = sample_loss_func
-        self.z = torch.zeros(num_datapoints,device=device)
-        self.idx = 0
-        self.reduction = reduction
-    
-    def set_z_values(self, z, idx):
-        self.z = z
-        self.idx = idx
-
-    def forward(self, predictions, target,epoch,prior):
-        # sample_loss = self.sample_loss_func(predictions, target)
-
-        # adjusted_sample_loss = torch.sqrt(2 * self.sample_loss_func(predictions, target))
-
-        # squared_loss = 0.5 * torch.square(self.z[self.idx] - adjusted_sample_loss)
-        loss,_=self.sample_loss_func(epoch,predictions, target,prior,True)
-        squared_loss = 0.5 * torch.square(self.z[self.idx] -
-                                           torch.sqrt(2 * loss ))
-        if self.reduction == 'mean':
-            return torch.mean(squared_loss)
-        elif self.reduction == 'sum':
-            return torch.sum(squared_loss)
-        else:
-            return squared_loss    
-        
-        
-## Custom CE Loss 
-
-
-class customCrossEntropy(nn.Module):
-    def __init__(self, device, reduction='none'):
-        super(customCrossEntropy, self).__init__()
-        self.vanillaCrossEntropy = nn.CrossEntropyLoss(reduction='none').to(device)
-        self.reduction = reduction
-        self.device = device
-
-    def forward(self, predictions, target):
-        # Compute the logits relative to the correct class to stabilize the computation.
-        reduced_exponents = predictions - predictions.gather(1, target.unsqueeze(1)).squeeze()[:, None]
-        
-        # Use torch.logsumexp for numerical stability.
-        # We keep dimensions consistent with the input for compatibility with further operations.
-        loss_elements = torch.logsumexp(reduced_exponents, dim=1)
-        
-        # # Adjust for extremely small values to prevent underflow.
-        # loss_elements[loss_elements < 1e-38] = 1e-38
-
-        # Calculate the conditional loss: custom loss for correct classifications,
-        # and vanilla cross-entropy for incorrect ones.
-        loss_return = torch.where(torch.argmax(predictions, dim=1) == target, 
-                                  loss_elements,
-                                  self.vanillaCrossEntropy(predictions, target))
-
-        # Apply the specified reduction to the loss.
-        if self.reduction == 'mean':
-            return loss_return.mean()
-        elif self.reduction == 'sum':
-            return loss_return.sum()
-        else:
-            return loss_return
-
-
-class customCrossEntropy(nn.Module):
-  def __init__(self, device, reduction = 'none'):
-    super(customCrossEntropy, self).__init__()
-    self.vanillaCrossEntropy = nn.CrossEntropyLoss(reduction='none').to(device)
-    self.reduction = reduction
-    self.device = device
-
-  def forward(self, predictions, target):
-
-    reduced_exponents = predictions - predictions.gather(1, target.unsqueeze(1)).squeeze()[:, None]
-    loss_elements = torch.logsumexp(reduced_exponents.type(torch.float64), dim=1) #+ 1e-38
-    # loss_elements = torch.logsumexp(reduced_exponents, dim=1) #+ 1e-38
-    # exp = torch.expm1(reduced_exponents.type(torch.float64))+ 1
-    # loss_elements = torch.log1p(torch.sum(exp, dim = 1) - 1).type(torch.float64)
-
-    # At a certain point PyTorch division will recognize a value as zero even if it is not
-    # this helps set extremely small values above that treshhold (happens rarely)
-    # loss_elements[loss_elements < 1e-38] = 1e-38
-
-    loss_return = torch.where(torch.argmax(predictions, dim=1) == target, 
-                   loss_elements,
-                   self.vanillaCrossEntropy(predictions, target))
-
-    if self.reduction == 'mean':
-        return loss_return.mean()
-    elif self.reduction == 'sum':
-        return loss_return.sum()
-    else:
-        return loss_return        
-    
-    
-import torch
-from torch import Tensor
-from torch.optim.optimizer import (Optimizer, _use_grad_for_differentiable, _get_value, _dispatch_sqrt,
-                        _stack_if_compiling, _capturable_doc, _differentiable_doc, _foreach_doc,
-                        _fused_doc, _maximize_doc, _default_to_fused_or_foreach)
-from typing import List, Optional
-from torch.utils._foreach_utils import _group_tensors_by_device_and_dtype
-
-# __all__ = ["AdamW", "adamw"]
 
 
 class AdamWq(Optimizer):
     def __init__(
         self,
         params,
-        lr=1e-3,
-        q=2,
+        lr=2e-3, # 1e-3,
+        q=1.051, # 2
         betas=(0.9, 0.999),
         eps=1e-8,
-        weight_decay=1e-2,
+        weight_decay=5e-4,
         amsgrad=False,
         *,
         maximize: bool = False,
@@ -690,18 +561,5 @@ def _single_tensor_adamw(
                 denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt).add_(eps)
 
             # param.addcdiv_(exp_avg, denom, value=-step_size)
-            # update = q*torch.abs(param.data)** (q - 1) * torch.sign(param.data) + exp_avg / denom * -step_size
-            # param.data = torch.abs(update/q)**(1 / (q - 1)) * torch.sign(update)
             update = torch.abs(param.data)** (q - 1) * torch.sign(param.data) + exp_avg / denom * -step_size
-            param.data = torch.abs(update)**(1 / (q - 1)) * torch.sign(update)    
-    
-## get extras required for RMD
-def get_RMD_losses(device,loader):
-    N = len(loader)
-    z =  torch.normal(0.0, 0.0000005, size=(N,), device=device)#.type(torch.float64) #small z
-    per_sample_loss = torch.zeros(N, device=device).type(torch.float64)
-    per_sample_criterion = customCrossEntropy(device, reduction = 'none').to(device)#.type(torch.float64)
-    total_loss = torch.zeros(200, device=device)
-    lmbda = 0.1
-    rmd_criterion = RMD_Loss(per_sample_criterion,device=device, num_datapoints=N) #losses are averaged in minibatch
-    return z, per_sample_loss, per_sample_criterion, total_loss, lmbda, rmd_criterion
+            param.data = torch.abs(update)**(1 / (q - 1)) * torch.sign(update)

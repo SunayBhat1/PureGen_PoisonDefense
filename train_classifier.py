@@ -21,19 +21,9 @@ except: pass
 from utils.utils import *
 from utils.utils_clf import *
 from utils.utils_baselines import *
-from utils.adam_wq import *
-from utils.SMD_opt import *
+from utils.utils_optim import AdamWq, SMD_qnorm
 
 def main(rank, args):
-
-    if rank == 0: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[300]_T[0.0001]'
-    elif rank == 1: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[1500]_T[0.0001]_compressed50'
-    elif rank == 2: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[500]_T[0.0001]_compressed75'
-    elif rank == 3: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[500]_T[0.0001]_compressed85'
-    elif rank == 4: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[600]_T[0.0001]'
-    elif rank == 5: args.data_key = 'EBMSNGAN32[cinic10imagenet_ep585_nf128]_Steps[1500]_T[0.0001]_compressed75'
-    elif rank == 6: target_index = None
-    elif rank == 7: target_index = None
 
     ##############################
     # Setup

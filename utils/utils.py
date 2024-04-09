@@ -7,7 +7,7 @@ import json
 import glob
 
 
-from clf_models import load_model
+from utils.clf_models import load_model
 from utils.utils_clf import *
 from utils.utils_optim import *
 
