@@ -14,22 +14,24 @@ try:
     import torch_xla.distributed.xla_multiprocessing as xmp
 except: pass
 
-from EBM.EBM_models import create_ebm
-from Diffusion.Diff_models import create_diff
+from utils.EBM_models import create_ebm
+from utils.Diff_models import create_diffusion_model
+from utils.utils_purify import timestep_to_sinusoial_tensor
 
-from Diffusion.gaussian_diffusion import (
-    GaussianDiffusion,
-    get_named_beta_schedule,
-    ModelMeanType,
-    ModelVarType,
-    LossType)
+# from Diffusion.gaussian_diffusion import (
+#     GaussianDiffusion,
+#     get_named_beta_schedule,
+#     ModelMeanType,
+#     ModelVarType,
+#     LossType)
 
 class PureDefense:
     def __init__(self, device, device_type = 'xla',
                  ebm_type=None,ebm_path=None,ebm_nf=128,
                  diff_type=None,diff_path=None, diff_nf=128, 
-                 diff_schedule='cosine', diff_train_steps=1000, diff_output='epsilon',
-                 img_sz=32,verbose=True
+                 time_emb_dim=64, num_res_blocks=2,
+                #  diff_schedule='cosine', diff_train_steps=1000, diff_output='epsilon',img_sz=32,
+                 verbose=True
                  ):
         '''
         '''
@@ -39,8 +41,8 @@ class PureDefense:
         self.ebm_type = ebm_type
         self.diff_type = diff_type
         self.EBM = None
-        self.Diff_model = None
-        self.diffusion = None
+        self.DM = None
+        # self.diffusion = None
 
         self.forward_ebm_norm = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         self.inverse_ebm_norm = transforms.Normalize((-1, -1, -1), (2, 2, 2))
@@ -49,7 +51,7 @@ class PureDefense:
             self.get_ebm(ebm_type, ebm_path, ebm_nf, verbose)
 
         if self.diff_type is not None:
-            self.get_diff(diff_type, diff_path, diff_schedule, diff_train_steps, diff_output, diff_nf, img_sz, verbose)
+            self.get_diff(diff_type, diff_path,time_emb_dim, num_res_blocks,diff_nf)
             
 
     def purify(self, data_loader, 
@@ -85,8 +87,12 @@ class PureDefense:
                             langevin_temp=ebm_lang_temp,
                         ).squeeze(0)
                     
-                if self.Diff_model is not None and diff_steps > 0:
-                    input = self.diff_purfiy(input, diff_steps=diff_steps,eta = diff_eta).squeeze(0)
+                if self.DM is not None and diff_steps > 0:
+                    t_s = torch.ones(input.shape[0]) * diff_steps
+                    diff_predict = self.DM(input, timestep_to_sinusoial_tensor(t_s,64).to(self.device))
+                    input = input + diff_predict
+
+                if self.device_type =='xla': xm.mark_step()
 
             input = self.inverse_ebm_norm(input)
 
@@ -191,10 +197,12 @@ class PureDefense:
 
         if verbose: print(f'Loaded {ebm_type} from {ebm_path}')
     
-    def get_diff(self, diff_type, diff_path, 
-                 diff_schedule, diff_steps,
-                 diff_output='epsilon',
-                 nf=128, img_sz=32, verbose=True):
+    def get_diff(self, diff_type, diff_path,
+                time_emb_dim=64, num_res_blocks=2,
+                 nf=128, channels=3,
+                #  diff_schedule, diff_steps,
+                #  diff_output='epsilon',
+                  verbose=True):
         """
         Loads a Differential Model from a specified path.
 
@@ -210,25 +218,25 @@ class PureDefense:
         """
 
         # Create the Differential model
-        self.Diff = create_diff(diff_type,img_sz,nf)
+        self.DM = create_diffusion_model(diff_type,channels,channels,time_emb_dim=time_emb_dim, num_res_blocks=num_res_blocks, nf=nf)
         self.diff_type = diff_type
 
         # Load the state dictionary of the Differential model
         state_dict = torch.load(diff_path, map_location=torch.device('cpu'))
-        self.Diff.load_state_dict(state_dict)
+        self.DM.load_state_dict(state_dict)
 
         # Move the Diffusion model to the device
-        self.Diff_model = self.Diff.to(self.device)
+        self.DM = self.DM.to(self.device)
 
-        betas = get_named_beta_schedule(diff_schedule,diff_steps)                            
-        self.diffusion = GaussianDiffusion(
-                            betas=betas,
-                            model_mean_type=(
-                                ModelMeanType.EPSILON if diff_output == 'epsilon'
-                                else ModelMeanType.START_X
-                            ),
-                            model_var_type=ModelVarType.FIXED_LARGE,
-                            loss_type=LossType.MSE
-                        )
+        # betas = get_named_beta_schedule(diff_schedule,diff_steps)                            
+        # self.diffusion = GaussianDiffusion(
+        #                     betas=betas,
+        #                     model_mean_type=(
+        #                         ModelMeanType.EPSILON if diff_output == 'epsilon'
+        #                         else ModelMeanType.START_X
+        #                     ),
+        #                     model_var_type=ModelVarType.FIXED_LARGE,
+        #                     loss_type=LossType.MSE
+        #                 )
 
         if verbose: print(f'Loaded {diff_type} from {diff_path}')

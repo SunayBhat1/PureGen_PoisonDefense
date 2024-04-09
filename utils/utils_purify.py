@@ -263,7 +263,7 @@ def process_args(args, rank):
     Function to process the arguments for distributed training
     '''
     # List of argument names to process
-    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_train_steps', 'diff_purify_steps', 'diff_eta','ebm_name','diff_name','ebm_nf','diff_nf','num_images_narcissus']
+    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_T','ebm_name','diff_name','ebm_nf','diff_nf','num_images_narcissus']
 
     for arg_name in arg_names:
         arg_value = getattr(args, arg_name)
@@ -343,3 +343,61 @@ def get_ngt(data_root,train=True,transform=transforms.Compose([transforms.ToTens
         dataset = AdvDataSet(y_test,x_test,transform=transform)
 
     return dataset
+
+
+def timestep_to_sinusoial_tensor(timesteps, n):
+    """
+    Convert a tensor of timesteps to sinusoidal vectors of length n and return as a PyTorch tensor.
+
+    Parameters:
+    timesteps (torch.Tensor): A 1D tensor of timesteps for each image in the batch.
+    n (int): The length of the sinusoidal vector.
+
+    Returns:
+    torch.Tensor: A 2D tensor of sinusoidal vectors of shape (batch_size, n) encoding the timesteps.
+    """
+    batch_size = timesteps.shape[0]
+    position = torch.arange(n, dtype=torch.float32).unsqueeze(0)  # Shape: (1, n)
+    div_term = torch.pow(10000, 2 * position / n)  # Shape: (1, n)
+
+    # Sinusoidal encoding for even indices, cosine for odd indices
+    sinusoidal_tensor = torch.zeros(batch_size, n, dtype=torch.float32)
+    sinusoidal_tensor[:, 0::2] = torch.sin(timesteps.unsqueeze(1) / div_term[:, 0::2])  # Even indices
+    sinusoidal_tensor[:, 1::2] = torch.cos(timesteps.unsqueeze(1) / div_term[:, 1::2])  # Odd indices
+
+    return sinusoidal_tensor
+
+
+def ebm_purify(ebm_model,X_input,langevin_steps,langevin_temp=1e-4):
+    """
+    Purifies the input tensor X using the Energy-Based Model (EBM).
+
+    Parameters:
+    ebm_model (torch.nn.Module): The Energy-Based Model.
+    X_input (torch.Tensor): The input tensor to be purified.
+    langevin_steps (int, optional): The number of Langevin steps for the EBM. Defaults to 20.
+    langevin_temp (float, optional): The temperature for the Langevin dynamics. Defaults to 1e-4.
+    requires_grad (bool, optional): If True, the input tensor X is cloned and requires gradient. Defaults to True.
+
+    Returns:
+    torch.Tensor: The purified tensor.
+    """
+
+    # EBM Update
+    langevin_init_noise = 0.0
+    langevin_eps = 1.25e-2
+
+    # Set true for MCMC
+    X_purify = torch.autograd.Variable(X_input.clone(), requires_grad=True)
+
+    X_purify = X_purify + langevin_init_noise * torch.randn_like(X_purify)
+
+    for ell in range(langevin_steps):
+        energy = ebm_model(X_purify).sum() / langevin_temp
+        grad = torch.autograd.grad(energy, [X_purify], create_graph=False)[0]
+        X_purify.data -= ((langevin_eps ** 2) / 2) * grad
+        X_purify.data += langevin_eps* torch.randn_like(grad)
+        xm.mark_step()
+    xm.mark_step()
+
+    return X_purify

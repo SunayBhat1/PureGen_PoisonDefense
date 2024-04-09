@@ -17,7 +17,7 @@ import random
 try: import torch_xla.core.xla_model as xm
 except: pass
 
-from clf_models import load_model
+from utils.clf_models import load_model
 
 # Normalization
 cifar_mean = (0.4914, 0.4822, 0.4465)
