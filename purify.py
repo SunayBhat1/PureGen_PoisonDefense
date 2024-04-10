@@ -160,10 +160,10 @@ if __name__ == '__main__':
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
     args_diff.add_argument('--diff_model', default='UNET_SMALL', type=none_or_str, choices=[None, 'DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
-    args_diff.add_argument('--diff_name', default='cifar10_ep120_nf64_EBM[cinic10_imagenet_ep120_nf32]', type=str_or_str_list, help='path to the diffusion model')
+    args_diff.add_argument('--diff_name', default='cifar10_ep120_nf64_EBM[cinic10_imagenet_ep120_nf32]_1', type=str_or_str_list, help='path to the diffusion model')
     args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
     args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')
-    args_diff.add_argument('--num_res_blocks', default=2, type=int, help='number of res blocks in the unet')
+    args_diff.add_argument('--num_res_blocks', default=4, type=int, help='number of res blocks in the unet')
     args_diff.add_argument('--diff_T', default=150, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
 
 

@@ -138,7 +138,6 @@ class PureDefense:
         if self.device_type =='xla': xm.mark_step()
 
         return X_purify
-    
 
     def diff_purfiy(self, X_input, diff_steps, eta=0,requires_grad=True):
 

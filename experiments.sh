@@ -2,23 +2,19 @@
 # Nodes Lists #
 ###############
 
-### Node1 Base: Res18_HLB NGT
+### Node8:
+# Compare EBMs Minnesota
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1';
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2';
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1' --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2' --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf128]';
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf128]' --poison_type 'Narcissus';
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None;
-python3 purify.py --remote_user 'sunaybhat' --diff_model None;
-python3 purify.py --remote_user 'sunaybhat';
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2;
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'Narcissus';
-
-python3 train_classifier.py --remote_user 'sunaybhat';
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]';
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep120_nf64_EBM[cinic10_imagenet_ep120_nf32]]_T[150]';
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep120_nf64_EBM[cinic10_imagenet_ep120_nf32]]_T[150]_reps2';
-
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1]_T[150]';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2]_T[150]';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf96]]_T[150]';
 
 # ### Node 8: Train small EBMS CINIC-10 
 # python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;
