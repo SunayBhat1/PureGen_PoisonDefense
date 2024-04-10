@@ -81,7 +81,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
             else:
                 raise Exception(f"Dataset {args.dataset} not supported for transfer poison mode")
             
-        target_mask_label = None
+        _, _, target_mask_label = load_poisons(args,target_index)
 
     elif args.poison_type == 'NGT':
         base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense','NGT',args.data_key + '.pt'))

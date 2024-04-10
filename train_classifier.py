@@ -114,11 +114,10 @@ def main(rank, args):
         else:
             cifar_test_loader = torch.utils.data.DataLoader(cifar_test_data, batch_size=128,num_workers=4)
 
-    if not args.no_poison and args.poison_type != 'NGT':
-        if args.poison_type == 'Narcissus':
-            test_trigger_loaders = get_poisons_target(args, target_index, test_transforms, target_mask = target_mask_label)
-        else:
-            poison_target_image, target_orig_label = get_poisons_target(args, target_index, test_transforms)
+    if args.poison_type == 'Narcissus':
+        test_trigger_loaders = get_poisons_target(args, target_index, test_transforms, target_mask = target_mask_label)
+    else:
+        poison_target_image, target_orig_label = get_poisons_target(args, target_index, test_transforms)
 
     if args.verbose: 
         if 'HLB' in args.model and args.dataset in ['cifar10']: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.images)}')
@@ -271,7 +270,7 @@ def main(rank, args):
     if args.dataset == 'cinic10':
         cifar_end_acc = get_test_acc(target_net, cifar_test_loader, device)
 
-    if not args.no_poison and args.poison_type != 'NGT':
+    if args.poison_type != 'NGT':
 
         if args.poison_type != 'Narcissus':
             img_dim = dataset_dict[args.dataset]['img_dim']
@@ -292,7 +291,7 @@ def main(rank, args):
     # Save the results and models
     ##############################
                 
-    if args.no_poison or args.poison_type == 'NGT':
+    if args.poison_type == 'NGT':
         get_accs_save_results_clean(args, rank, target_index, end_acc, training_time, logs)
     else:
         if args.poison_type != 'Narcissus':
@@ -343,7 +342,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=11, type=int,help='seed for reproducibility')
     parser.add_argument('--save_models', default=False, action='store_true',help="Whether to save the models")
     parser.add_argument('--exp_name', default=None, type=str,help='name of the experiment to append to the output dataframe')
-    parser.add_argument('--no_poison', default=False, action='store_true',help='whether to run the attack or not')
+    parser.add_argument('--no_poison', default=False, action='store_true',help='Whether to run attack or not (baseline performance with no attack on poison criterion)')
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
     parser.add_argument('--output_dir', default='/home/results_PureGen_PoisonDefense/', type=str, help='path to the output directory')
@@ -353,9 +352,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cifar10_NGT','cinic10','stl10','stl10_64','tinyimagenet'],help='dataset to use')
     parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
     parser.add_argument('--model', default='HLB', type=str, choices=['HLB','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
-    parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
+    parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','linear','fine_tune'],help='mode of attack')
     parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus','NGT','GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
-    parser.add_argument('--fine_tune', default=False, action='store_true',help="Whether retrain the full model (fine-tuning) or just the linear layer (default: False)")
     parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','Epic','Friendly'],help='type of defense to use')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
     
@@ -423,7 +421,7 @@ if __name__ == '__main__':
     # Create the output directory and get the timestamp
     args.experiment_timestamp = time.strftime("%Y_%m_%d_%H_%M", time.localtime())
     if args.no_poison:
-        args.output_dir = os.path.join(args.output_dir, 'Clean')
+        args.output_dir = os.path.join(args.output_dir, 'Clean',args.poison_type)
     elif args.poison_type == 'NGT':
         args.output_dir = os.path.join(args.output_dir, 'NGT')
     else:

@@ -2,19 +2,29 @@
 # Nodes Lists #
 ###############
 
+python3 train_classifier.py --remote_user 'sunaybhat' --no_poison;
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'cinic10_ep585_nf192' --ebm_nf 192 --diff_model None;
+
+
 ### Node8:
-# Compare EBMs Minnesota
-python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1';
-python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2';
-python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1' --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2' --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf128]';
-python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf128]' --poison_type 'Narcissus';
+# Compare EBMs eps 16
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --dataset 'cifar10' --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1' --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2' --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep1_nf64_EBM[cinic10_imagenet_ep120_nf96]' --poison_type 'Narcissus' --num_res_blocks 4 --diff_nf 96 --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep60_nf64_EBM[cinic10_imagenet_ep120_nf96]' --poison_type 'Narcissus' --num_res_blocks 4 --diff_nf 96 --noise_eps_narcissus 16;
 
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'Baseline' --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]' --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1]_T[150]' --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2]_T[150]' --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep60_nf64_EBM[cinic10_imagenet_ep120_nf96]]_T[150]' --noise_eps_narcissus 16;
 
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_1]_T[150]';
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf32]_2]_T[150]';
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep180_nf64_EBM[cinic10_imagenet_ep120_nf96]]_T[150]';
+python3 purify.py --remote_user 'sunaybhat' --diff_name 'cifar10_ep1_nf64_EBM[cinic10_imagenet_ep120_nf96]' --num_res_blocks 4 --diff_nf 96;
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key 'EBM[cinic10_imagenet_ep120_nf32]_Steps[150]_T[0.0001]_UNET_SMALL[cifar10_ep1_nf64_EBM[cinic10_imagenet_ep120_nf96]]_T[150]' --noise_eps_narcissus 16;
+
 
 # ### Node 8: Train small EBMS CINIC-10 
 # python3 EBM/train_EBM.py --dataset 'cincic10_imagenet_subset' --model 'SuperLightEBM' --num_filters 48 --lr 1e-5 --lr_decay_milestones 25 50 75 100;

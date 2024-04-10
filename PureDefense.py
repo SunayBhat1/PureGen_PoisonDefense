@@ -129,6 +129,8 @@ class PureDefense:
 
         X_purify = X_purify + langevin_init_noise * torch.randn_like(X_purify)
 
+        print(langevin_steps)
+
         for ell in range(langevin_steps):
             energy = self.EBM(X_purify).sum() / langevin_temp
             grad = torch.autograd.grad(energy, [X_purify], create_graph=False)[0]
