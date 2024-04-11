@@ -1,10 +1,13 @@
 ###############
 # Nodes Lists #
 ###############
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_mode 'clean';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_mode 'clean' --config_override 'ResNet18';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_mode 'clean' --config_override 'R18_HLB';
 
-python3 train_classifier.py --remote_user 'sunaybhat' --no_poison;
-
-python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'cinic10_ep585_nf192' --ebm_nf 192 --diff_model None;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'cinic10_ep585_nf192' --ebm_nf 192; # I've defaulted diff model to None for now
+python3 purify.py --remote_user 'sunaybhat' --ebm_model 'EBMSNGAN32' --ebm_name 'cinic10_ep585_nf192' --ebm_nf 192 --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --config_override 'ResNet18' --data_key 'EBMSNGAN32[cinic10_ep585_nf192]_Steps[150]_T[0.0001]';
 
 
 ### Node8:

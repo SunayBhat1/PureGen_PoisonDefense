@@ -16,7 +16,7 @@ except: pass
 
 from utils.EBM_models import create_ebm
 from utils.Diff_models import create_diffusion_model
-from utils.utils_purify import timestep_to_sinusoial_tensor
+from utils.utils_purify import timestep_to_sinusoial_tensor, purify
 
 # from Diffusion.gaussian_diffusion import (
 #     GaussianDiffusion,
@@ -82,10 +82,13 @@ class PureDefense:
             for i in range(purify_reps):
 
                 if self.EBM is not None and ebm_lang_steps > 0:
-                    input = self.ebm_purify(input,
-                            langevin_steps=ebm_lang_steps,
-                            langevin_temp=ebm_lang_temp,
-                        ).squeeze(0)
+                    print('Purifying with EBM number of steps:', ebm_lang_steps)
+                    # input = self.ebm_purify(input,
+                    #         langevin_steps=ebm_lang_steps,
+                    #         langevin_temp=ebm_lang_temp,
+                    #     ).squeeze(0)
+
+                    input = purify(input, self.EBM, langevin_steps=ebm_lang_steps)
                     
                 if self.DM is not None and diff_steps > 0:
                     t_s = torch.ones(input.shape[0]) * diff_steps

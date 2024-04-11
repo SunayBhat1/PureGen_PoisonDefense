@@ -9,15 +9,15 @@ import torch.nn.init as init
 import math
 
 
-def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,hlb_type='small',img_size=32):
+def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,img_size=32):
     if model_name == 'ResNet18': 
         model = ResNet18Style(RN18BasicBlock, [2,2,2,2], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn,img_size=img_size)
     elif model_name == 'ResNet34':
         model = ResNet18Style(RN18BasicBlock, [3,4,6,3], num_classes=num_classes, eval_bn=eval_bn,grad_bn=grad_bn,img_size=img_size)
     elif model_name == 'ResNet18_HLB':
         model = ResNet18_HLB(img_size=img_size, num_classes=num_classes)
-    elif model_name == 'HLB':
-        model = make_hlb_net(hlb_type)
+    elif model_name in ['HLB_S', 'HLB_M', 'HLB_L']:
+        model = make_hlb_net(model_name)
     elif model_name == 'MobileNetV2':
         model = MobileNetV2(num_classes=num_classes)
     elif model_name == 'DenseNet121':
@@ -916,7 +916,7 @@ class HLB_ConvGroup(nn.Module):
 
 #### Network Definition ###
 
-def make_hlb_net(hlb_type='small'):
+def make_hlb_net(hlb_type='HLB_S'):
 
     hlb_args = {
                 'block_sizes': [1,4,4],
@@ -929,11 +929,11 @@ def make_hlb_net(hlb_type='small'):
                 'scaling_factor': 1/9,
             }
     
-    if hlb_type == 'medium':
+    if hlb_type == 'HLB_M':
         hlb_args['block_sizes'] = [2, 6, 6]
         hlb_args['batchnorm_momentum'] = 0.6
 
-    if hlb_type == 'large':
+    if hlb_type == 'HLB_l':
         hlb_args['heavy'] = True
         hlb_args['block_sizes'] = [1,4,4]
         hlb_args['batchnorm_momentum'] = 0.6
