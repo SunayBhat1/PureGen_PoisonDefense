@@ -7,12 +7,23 @@ import json
 import glob
 
 
-from clf_models import load_model
+from utils.clf_models import load_model
 from utils.utils_clf import *
 from utils.utils_optim import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass
+
+dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
+                'cinic10':{'num_classes':10,'img_dim':32},
+                'tinyimagenet':{'num_classes':200,'img_dim':64},
+                'stl10':{'num_classes':10,'img_dim':96},
+                'stl10_64':{'num_classes':10,'img_dim':64},
+                }
+
+######################
+# Argument Functions #
+######################
                 
 def set_args_from_config(args, config, section_name):
 
@@ -62,7 +73,7 @@ def get_device(device_type='xla'):
 def check_training_end(args,target_index):
     if args.poison_type == 'Narcissus' and target_index >= 10: 
         return True
-    elif args.poison_type == 'Gradient_Matching' and target_index >= 100:
+    elif args.poison_type == 'GradientMatching' and target_index >= 100:
         return True
     elif args.poison_type == 'BullseyePolytope' and target_index >= 50:
         return True
@@ -91,31 +102,29 @@ def set_target_index_and_check_end(args, rank):
 # Eval Functions   #
 ####################
 
-def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=None, poison_target_image=None, target_mask_label=None,cifar_test_loader=None, target_index=None):
+def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=None, poison_target_image=None, target_mask_label=None, target_index=None):
 
     # Test the model for from_scratch attacks
-    if args.poison_mode == 'from_scratch':
-        if 'HLB' in args.model and args.dataset == 'cifar10':
-            test_acc = eval_HLB(target_net, test_loader, device)
-        else:
-            test_acc = get_test_acc(target_net, test_loader, device)
+    if args.poison_mode in ['from_scratch','clean']:
+        test_acc = get_test_acc(target_net, test_loader, device)
         logs['test_acc'].append(test_acc)
         
-        if args.dataset == 'cinic10':
-            if 'HLB' in args.model:
-                cifar_acc = eval_HLB(target_net, cifar_test_loader, device)
-            else:
-                cifar_acc = get_test_acc(target_net, cifar_test_loader, device)
-            logs['cifar_acc'].append(cifar_acc)
-
-        if not args.no_poison:
+        if args.poison_type != 'NeuralTangent':
             if args.poison_type == 'Narcissus':
                 _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
                 logs['p_acc'].append(p_acc)
                 logs['t_acc'].append(t_acc)
+
+            else:
+                img_dim = dataset_dict[args.dataset]['img_dim']
+                target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
+                pred = torch.argmax(target_pred).item()
+                success = bool(pred == target_mask_label)
+                logs['p_acc'].append(success)
             
-    elif not args.no_poison and args.poison_type != 'Narcissus':
-        target_pred = target_net(poison_target_image.to(device).view(1,3,32,32))
+    elif args.poison_type not in ['Narcissus','NeuralTangent']:
+        img_dim = dataset_dict[args.dataset]['img_dim']
+        target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
         pred = torch.argmax(target_pred).item()
         success = bool(pred == target_mask_label)
         logs['p_acc'][-1] = success
@@ -131,29 +140,13 @@ def get_test_acc(net, loader, device):
             images, labels = data
             images, labels = images.to(device), labels.to(device)
             outputs = net(images)
+            
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
     acc = correct / total
     return acc
-
-def eval_HLB(model, loader,device):
-    model.eval()
-    with torch.no_grad():
-        outs = []
-        # Iterate over each batch from the loader
-        for inputs, _ in loader:
-            inputs = inputs.to(device)
-            # Apply the model to the inputs and their flipped versions, then sum the results
-            output = model(inputs) + model(inputs.flip(-1))
-            # Append the output to the list of outputs
-            outs.append(output)
-            xm.mark_step()
-
-        # Concatenate the list of outputs into a single tensor
-        outs = torch.cat(outs)
-    return (outs.argmax(1) == loader.labels.to(device)).float().mean().item()
 
 def run_test_epoch_narcissus(test_loader, model, loss_fn, poisoned_label, device):
     model.eval()
@@ -199,7 +192,7 @@ def update_progress_bar(args, pbar, epoch, logs):
 
     # Update progress bar
     pbar.update(1)
-    if args.no_poison:
+    if args.poison_mode == 'clean' or args.poison_type == 'NeuralTangent':
         pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%}')
     elif args.poison_type != 'Narcissus':
         pbar.set_description(f'Epoch {epoch+1}/{args.epochs} | Test Acc {logs["test_acc"][-1]:.2%} | Poison Success {logs["p_acc"][-1]} | ')
@@ -282,7 +275,7 @@ def get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_
     df = pd.DataFrame(columns=['Data Key','Model','Dataset','Target Index','End Acc',
                                 'P1 Acc','T1 Acc','Exp Name',
                                 'Calc Time','Train Time',
-                                'P2 Acc','T2 Acc', 'P3 Acc','T3 Acc',
+                                'P2 Acc','T2 Acc',
                                 'Args','Logs'
                                 ])
     
@@ -304,7 +297,6 @@ def get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_
                                         'Calc Time': args.experiment_timestamp,
                                         'Train Time': training_time,
                                         'P2 Acc': p_accs[2], 'T2 Acc': t_accs[2],
-                                        'P3 Acc': p_accs[3], 'T3 Acc': t_accs[3],
                                         'Args': args_str, 'Logs': logs_str, 
                                     }, index=[0])], ignore_index=True)
     

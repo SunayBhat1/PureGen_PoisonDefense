@@ -35,7 +35,8 @@ def generate_friendly_noise(
         clamp_max=32/255,
         return_preds=False,
         loss_fn='KL',
-        model_train = False
+        model_train = False,
+        img_dim = 32
         ):
 
 
@@ -62,7 +63,7 @@ def generate_friendly_noise(
     trainloader.dataset.transform = transforms.Compose([transforms.ToTensor()])
 
     dataset_size = len(trainloader.dataset)
-    friendly_noise = torch.zeros((dataset_size, 3, 32, 32))
+    friendly_noise = torch.zeros((dataset_size, 3, img_dim, img_dim))
     if return_preds:
         preds = torch.zeros((dataset_size, 10))
 

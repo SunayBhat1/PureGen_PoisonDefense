@@ -9,6 +9,7 @@ from torchvision.datasets import *
 import torch.utils.data as data
 from tqdm import tqdm
 import pickle
+from PIL import Image
 
 import torch.nn.functional as F
 import random
@@ -16,68 +17,163 @@ import random
 try: import torch_xla.core.xla_model as xm
 except: pass
 
-from clf_models import load_model
+from utils.clf_models import load_model
+from utils.utils_optim import AdamWq, SMD_qnorm
 
-# Normalization
+#############
+# Variables #
+#############
+
+# Normalizations
+# cifar_mean = (0.4914, 0.4822, 0.4465)
+# cifar_std = (0.2023, 0.1994, 0.2010)
 cifar_mean = (0.4914, 0.4822, 0.4465)
-cifar_std = (0.2023, 0.1994, 0.2010)
-
-cifar_mean_gm = (0.4914, 0.4822, 0.4465)
-cifar_std_gm = (0.2471, 0.2435, 0.2616)
+cifar_std = (0.2471, 0.2435, 0.2616)
 
 stl10_mean = (0.4914, 0.4822, 0.4465)
 stl10_std = (0.2471, 0.2435, 0.2616)
 
+tinyimagenet_mean = (0.4802, 0.4481, 0.3975)
+tinyimagenet_std = (0.2302, 0.2265, 0.2262)
+
 # Dataset info dict
 dataset_dict = {'cifar10':{'num_classes':10,'img_dim':32},
                 'cinic10':{'num_classes':10,'img_dim':32},
-                'tiny_imagenet':{'num_classes':200,'img_dim':64},
+                'tinyimagenet':{'num_classes':200,'img_dim':64},
                 'stl10':{'num_classes':10,'img_dim':96},
+                'stl10_64':{'num_classes':10,'img_dim':64},
                 }
 
 # dataset_info dict
 dataset_info = {'from_scratch':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 5000},
                     'cinic10': {'num_classes': 10, 'num_per_label': 9000},
-                    'tiny-imagenet': {'num_classes': 200, 'num_per_label': 500},
+                    'tinyimagenet': {'num_classes': 200, 'num_per_label': 500},
                     'stl10': {'num_classes': 10, 'num_per_label': 500},
+                    'stl10_64': {'num_classes': 10, 'num_per_label': 500},
                     },
                 'transfer':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 200},
                     },
                 }
 
+# Poison num_targets dict
+poison_num_targets = {  'clean': {'Narcissus': 10},
+                        'from_scratch': {'Narcissus': 10,
+                                         'GradientMatching': 100,
+                                         'NeuralTangent': 8,
+                                        },
+                        'fine_tune': {'Narcissus': 10,
+                                        'BullseyePolytope': 50,
+                                        },
+                        'transfer': {'BullseyePolytope': 50,
+                                        'BullseyePolytope_Bench': 100,
+                                        },
+                        }
+
+####################
+#   General Utils  #
+####################
+
+def check_arg_errors(args):
+    '''
+    Check for errors in the arguments
+    '''
+    if args.poison_type == 'GradientMatching' and args.poison_mode == 'transfer':
+        raise ValueError('Gradient Matching does not support transfer attacks')
+    if args.poison_type == 'BullseyePolytope_Bench' and args.poison_mode == 'from_scratch':
+        raise ValueError('BullseyePolytope_Bench does not support from_scratch attacks')
+    if args.poison_type == 'BullseyePolytope' and args.poison_mode == 'from_scratch':
+        raise ValueError('BullseyePolytope does not support from_scratch attacks')
+    if args.selected_indices is not None and args.device_type != 'xla':
+        raise ValueError('selected_indices only supported for TPU')
+    if args.selected_indices is not None and args.poison_mode != 'from_scratch':
+        raise ValueError('selected_indices only supported for from_scratch attacks')
+    if args.baseline_defense != 'None' and args.data_key != 'Baseline':
+        raise ValueError('Baseline defenses only supported for baseline data')
+    
+def setup_directories(args):
+    # Setup directories for remote server
+    if args.remote_user is not None:
+        args.data_dir = args.data_dir.replace('/home',f'/home/{args.remote_user}')
+        args.output_dir = args.output_dir.replace('/home',f'/home/{args.remote_user}')
+
+    # Create the output directory
+    args.output_dir = os.path.join(args.output_dir,args.poison_mode.title(),args.poison_type.title())
+
+    if not os.path.exists(args.output_dir): 
+        os.makedirs(args.output_dir)
 
 ####################
 # Train Data Utils #
 ####################
 
+def get_train_data(args,target_index,device):
+
+    test_trigger_loaders,poison_target_image, target_mask_label = None,None,None
+
+    train_transforms = get_train_transforms(args)
+
+    train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device)
+
+    if 'HLB' in args.model and args.dataset in ['cifar10']:
+        train_loader = train_data
+    else:
+        train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,num_workers=4)
+
+    # Print training data details
+    if args.verbose:
+        if args.poison_mode == 'clean' or args.poison_type == 'Neural_Tangent': p_count = 0
+        else: p_count = sum(p.sum().item() for _, _, _, p in train_loader)
+
+    if args.baseline_defense == 'Friendly':
+        
+        if args.poison_mode == 'from_scratch':
+            if args.dataset in ['cifar10','cinic10']:
+                train_transforms_no_augs = transforms.Compose([transforms.Normalize(mean=cifar_mean, std=cifar_std)])
+            elif args.dataset in ['stl10','stl10_64']:
+                train_transforms_no_augs = transforms.Compose([transforms.Normalize(mean=stl10_mean, std=stl10_std)])
+            elif args.dataset == 'tinyimagenet':
+                train_transforms_no_augs = transforms.Compose([transforms.Normalize(mean=tinyimagenet_mean, std=tinyimagenet_std)])
+            else:
+                raise ValueError('Friendly Defense not supported for this dataset')
+            train_data_no_augs, _ = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
+        else:
+            train_transforms_no_augs = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
+            train_data_no_augs, _ = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
+
+        train_loader_noaugs = torch.utils.data.DataLoader(train_data_no_augs, batch_size=args.batch_size, shuffle=True,num_workers=4)
+
+        return train_data, train_loader, train_loader_noaugs, p_count, test_trigger_loaders,poison_target_image, target_mask_label
+    
+    return train_data, train_loader, p_count, test_trigger_loaders,poison_target_image, target_mask_label
+
 def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
-    # Load the train data
-    if args.no_poison:
-        if args.poison_mode == 'from_scratch':
-            if args.dataset == 'cifar10':
-                base_data = CIFAR10(args.data_dir, train=True, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=transforms.ToTensor())
-            elif args.dataset == 'cinic10':
-                base_data = ImageFolder(os.path.join(args.data_dir, 'CINIC-10/train'), transform=transforms.ToTensor())
-            elif args.dataset == 'tiny-imagenet':
-                base_data = ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=transforms.ToTensor())
-            elif args.dataset == 'stl10':
-                base_data = STL10(args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transforms.ToTensor())
-            else:
-                raise Exception(f"Dataset {args.dataset} not supported for from_scratch poison mode")
-        elif args.poison_mode == 'transfer':
-            if args.dataset == 'cifar10':
-                base_data = torch.load(os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'))['others']
-            else:
-                raise Exception(f"Dataset {args.dataset} not supported for transfer poison mode")
-            
+    # NTG Attack Data
+    if args.poison_type == 'NeuralTangent':
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense','NeuralTangent',args.data_key + '.pt'))
+        base_data = Simple_Dataset_Base(base_data, transforms=transforms.Compose([transforms.ToTensor()]))
         target_mask_label = None
 
-    else:
+    # Clean Data
+    elif args.poison_mode == 'clean':
+        if args.dataset == 'cifar10':
+            base_data = CIFAR10(args.data_dir, train=True, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=transforms.ToTensor())
+        elif args.dataset == 'cinic10':
+            base_data = ImageFolder(os.path.join(args.data_dir, 'CINIC-10/train'), transform=transforms.ToTensor())
+        elif args.dataset == 'tinyimagenet':
+            base_data = ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=transforms.ToTensor())
+        elif args.dataset == 'stl10':
+            base_data = STL10(args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transforms.ToTensor())
+        else:
+            raise Exception(f"Dataset {args.dataset} not supported for from_scratch or clean poison mode")
 
-        base_data = torch.load(os.path.join(args.data_dir,'PureDefense',args.dataset,args.data_key + '.pt'))
+        _, _, target_mask_label = load_poisons(args,target_index)
+
+    # Poison Data
+    else:
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
 
         poison_tuple_list, poison_indices, target_mask_label = load_poisons(args,target_index)
 
@@ -114,7 +210,10 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
                 
     base_loader = data.DataLoader(base_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    train_data = PoisonedDataset(base_loader, poisoned = not args.no_poison, transform=train_transforms)
+    if args.poison_mode == 'clean' or args.poison_type == 'NeuralTangent':
+        train_data = PoisonedDataset(base_loader, poisoned = False, transform=train_transforms)
+    else:
+        train_data = PoisonedDataset(base_loader, poisoned = True, transform=train_transforms)
 
     if 'HLB' in args.model and args.dataset == 'cifar10':
         aug = {'flip': args.hlb_flip}
@@ -249,6 +348,27 @@ class Poisoned_Dataset_Base(data.Dataset):
             idx = self.valid_indices[index - len(self.poison_tuple_list)]
             img, label = self.img_label_list[idx]
         return self.transforms(img), label, index, p
+
+class Simple_Dataset_Base(data.Dataset):
+    def __init__(self, base_dataset, transforms):
+        """
+        Args:
+            base_dataset (Dataset): The base dataset.
+            transforms (callable): A function/transform that takes in an PIL image and returns a transformed version.
+        """
+
+        self.base_dataset = base_dataset
+        self.img_label_list = [(img, label) for img, label in base_dataset]
+        self.transforms = transforms
+        self.valid_indices = list(range(len(self.img_label_list)))
+
+    def __len__(self):
+        return len(self.valid_indices)
+
+    def __getitem__(self, index):
+        idx = self.valid_indices[index]
+        img, label = self.img_label_list[idx]
+        return self.transforms(img), label
 
 class PoisonedDataset_Bench(data.Dataset):
     def __init__(
@@ -394,21 +514,97 @@ class CifarLoader:
             else:
                 yield (images[idxs], self.labels[idxs])
 
+
 ###################
 # Test Data Utils #
 ###################
                 
-def get_test_dataset(args, transform):
+def get_test_dataset(args):
+
+    transform = get_test_transforms(args)
+
     if args.dataset == 'cifar10':
         test_data = CIFAR10(args.data_dir, train=False, download=(not os.path.exists(os.path.join(args.data_dir, 'cifar-10-batches-py'))), transform=transform)
     elif args.dataset == 'cinic10':
         test_data = ImageFolder(os.path.join(args.data_dir, 'CINIC-10/test'), transform=transform)
-    elif args.dataset == 'tiny-imagenet':
-        test_data = ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/test'), transform=transform)
+    elif args.dataset == 'tinyimagenet':
+        test_data = TinyImageNetValDataset(os.path.join(args.data_dir, 'tiny-imagenet-200'), transform=transform)
     elif args.dataset == 'stl10':
         test_data = STL10(args.data_dir, split='test', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=transform)
+    else:
+        raise Exception(f"Dataset {args.dataset} not supported in function get_test_dataset")
 
-    return test_data
+    if 'HLB' in args.model and args.dataset in ['cifar10']:
+        test_loader = CifarLoader(test_data, train=False, batch_size=1000,dataset_name=args.dataset)
+    else:
+        test_loader = torch.utils.data.DataLoader(test_data, batch_size=128,num_workers=4)
+
+    return test_loader, transform
+
+def get_test_transforms(args):
+    if args.dataset in ['cifar10','cinic10']:
+        test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
+    elif args.dataset == 'stl10':
+        test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
+    elif args.dataset == 'stl10_64':
+        test_transforms = transforms.Compose([transforms.Resize((64,64)),transforms.ToTensor(), transforms.Normalize(mean=stl10_mean, std=stl10_std)])
+    elif args.dataset == 'tinyimagenet':
+        test_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=tinyimagenet_mean, std=tinyimagenet_std)])
+
+    return test_transforms
+
+
+class TinyImageNetValDataset(data.Dataset):
+    def __init__(self, tiny_imagenet_folder, transform=None):
+        """
+        Initializes the dataset loader for the Tiny ImageNet validation set.
+        
+        Args:
+            tiny_imagenet_folder (string): Directory with all the Tiny ImageNet dataset, including 'val' folder.
+            transform (callable, optional): Optional transform to be applied on a sample.
+        """
+        
+        self.tiny_imagenet_folder = tiny_imagenet_folder
+        self.transform = transform
+
+        # Load class indices
+        self.classes = sorted(item for item in os.listdir(os.path.join(tiny_imagenet_folder, 'train')) if item != '.DS_Store')
+        self.class_to_idx = {cls_name: i for i, cls_name in enumerate(self.classes)}
+
+        # Load image paths and labels
+        self.image_paths, self.labels = self._load_labels_from_file(os.path.join(tiny_imagenet_folder, 'val', 'val_annotations.txt'))
+
+    def _load_labels_from_file(self, labels_file):
+        """
+        Loads image paths and labels from the val_annotations.txt file.
+        
+        Args: labels_file (string): Path to the val_annotations.txt file.
+        Returns: tuple: A tuple containing lists of image paths and their corresponding labels.
+        """
+        label_data = []
+        with open(labels_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                # Append the image path and class name
+                label_data.append((parts[0], parts[1]))
+
+        # Replace class names with indices and form full paths
+        labels = [self.class_to_idx[class_name] for _, class_name in label_data]
+        image_paths = [os.path.join(self.tiny_imagenet_folder, 'val', 'images', path) for path, _ in label_data]
+        return image_paths, labels
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        image_path = self.image_paths[idx]
+        image = Image.open(image_path).convert('RGB')
+
+        if self.transform:
+            image = self.transform(image)
+
+        label = self.labels[idx]
+        return image, label
 
 def apply_noise_patch(noise,images,offset_x=0,offset_y=0,mode='change',padding=20,position='fixed'):
     '''
@@ -518,7 +714,17 @@ def batch_cutout(inputs, size):
 #############
     
 def get_train_transforms(args):
-    if args.poison_mode == 'from_scratch' or args.poison_type in ['BullseyePolytope_Bench','Narcissus']:
+    if args.poison_type == 'NeuralTangent':
+
+        train_transforms = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((cifar_mean), (cifar_std)),
+            ])
+        
+        return train_transforms
+    elif args.poison_mode == 'from_scratch' or args.poison_type in ['BullseyePolytope_Bench','Narcissus']:
         if args.dataset in ['cifar10','cinic10']:
             train_transforms = [transforms.RandomCrop(32, padding=4),
                                                 transforms.RandomHorizontalFlip(),
@@ -527,7 +733,7 @@ def get_train_transforms(args):
             train_transforms = [transforms.RandomCrop(96, padding=4),
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
-        elif args.dataset == 'tiny-imagenet':
+        elif args.dataset == 'tinyimagenet':
             train_transforms = [transforms.RandomCrop(64, padding=4),
                                                 transforms.RandomHorizontalFlip(),
                                                 transforms.ToTensor()]
@@ -553,18 +759,19 @@ def get_train_transforms(args):
         if "bernoulli" in args.friendly_noise_type:
             train_transforms.append(BernoulliNoise(eps=args.friendly_noise_eps / 255))
 
-    if args.poison_mode == 'from_scratch':
-        if args.dataset == 'cifar10':
-            train_transforms.append(transforms.Normalize(cifar_mean_gm, cifar_std_gm))
-        elif args.dataset == 'cinic10':
-            train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
-        elif args.dataset == 'stl10':
-            train_transforms.append(transforms.Normalize(stl10_mean, stl10_std))
-    elif args.poison_mode == 'transfer':
+
+    if args.dataset in ['cifar10','cinic10']:
         train_transforms.append(transforms.Normalize(cifar_mean, cifar_std))
+    elif args.dataset in ['stl10','stl10_64']:
+        train_transforms.append(transforms.Normalize(stl10_mean, stl10_std))
+    elif args.dataset == 'tinyimagenet':
+        train_transforms.append(transforms.Normalize(tinyimagenet_mean, tinyimagenet_std))
+    else:
+        raise Exception(f"Dataset {args.dataset} transforms not supported for from_scratch poison mode")
 
     if args.baseline_defense == 'Friendly' or args.aug_rand_transforms:
-        train_transforms.append(RandomTransform(**dict(source_size=32, target_size=32, shift=8, fliplr=True), mode='bilinear'))
+        img_size = dataset_dict[args.dataset]['img_dim']
+        train_transforms.append(RandomTransform(**dict(source_size=img_size, target_size=img_size, shift=8, fliplr=True), mode='bilinear'))
 
     if args.aug_cutout:
         train_transforms.append(Cutout(n_holes=8, length=8))
@@ -572,6 +779,30 @@ def get_train_transforms(args):
 
     return transforms.Compose(train_transforms)
 
+class UniformNoise(object):
+    def __init__(self, eps):
+        self.eps = eps
+
+    def __call__(self, tensor):
+        out = tensor + torch.rand(tensor.size()) * self.eps * 2 -self.eps
+        return out
+
+class GaussianNoise(object):
+    def __init__(self, eps):
+        self.eps = eps
+
+    def __call__(self, tensor):
+        out = tensor + torch.randn(tensor.size()) * self.eps
+        return out
+
+class BernoulliNoise(object):
+    def __init__(self, eps):
+        self.eps = eps
+
+    def __call__(self, tensor):
+        noise = (torch.rand(tensor.size()) > 0.5).float() * 2 - 1
+        out = tensor + noise * self.eps
+        return out
 
 class Cutout(object):
     """Randomly mask out one or more patches from an image.
@@ -676,8 +907,8 @@ def load_target_network(args,device):
     num_classes = dataset_dict[args.dataset]['num_classes']
     img_dim = dataset_dict[args.dataset]['img_dim']
 
-    if args.poison_mode == 'from_scratch' or args.fine_tune:
-        target_net = load_model(args.model,hlb_type=args.hlb_type, num_classes=num_classes, img_size=img_dim)
+    if args.poison_mode in ['from_scratch','fine_tune']:
+        target_net = load_model(args.model, num_classes=num_classes, img_size=img_dim)
     elif args.poison_type == 'BullseyePolytope':
         target_net = load_model(args.model, eval_bn=True)
     elif args.poison_type == 'BullseyePolytope_Bench':
@@ -686,7 +917,7 @@ def load_target_network(args,device):
         target_net = load_model(args.model)
 
     # Load state dict for transfer learning
-    if args.poison_mode == 'transfer':
+    if args.poison_mode == 'linear_transfer':
             
         # Use benchmark if running BullseyePolytope_Bench
         if args.poison_type == 'BullseyePolytope_Bench':
@@ -710,7 +941,7 @@ def load_target_network(args,device):
         target_net = target_net.to(device)
 
     # Reinit Linear layer for transfer learning
-    if args.poison_mode == 'transfer' and args.reinit_linear:
+    if args.poison_mode == 'linear_transfer' and args.reinit_linear:
         if args.model == 'ResNet18':
             target_net.linear = nn.Linear(512, 10).to(device)
         elif args.model == 'DenseNet121':
@@ -721,9 +952,14 @@ def load_target_network(args,device):
 
     return target_net
 
+
+###################
+# Optimizer Utils #
+###################
+
 def get_optimizer(args,target_net):
 
-    if args.poison_mode == 'from_scratch':
+    if args.poison_mode in ['from_scratch','clean']:
 
         if args.model == 'ResNet18_HLB':
             optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
@@ -731,7 +967,7 @@ def get_optimizer(args,target_net):
             
             return optimizer
         
-        elif args.model == 'HLB':
+        elif args.model in ['HLB_S','HLB_M','HLB_L']:
             kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
             lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
             wd = args.weight_decay * args.batch_size / kilostep_scale
@@ -760,30 +996,13 @@ def get_optimizer(args,target_net):
             optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
         elif args.optim == 'smd':
-            no_decay = ['bias', 'bn']
-            grouped_parameters = [
-                {'params': [p for n, p in target_net.named_parameters() if not any(
-                    nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
-                {'params': [p for n, p in target_net.named_parameters() if any(
-                    nd in n for nd in no_decay)], 'weight_decay': 0.0}
-            ]
-            optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True,q=1.5)
+            SMD_qnorm(target_net.parameters(), lr=0.2, momentum=0.9, weight_decay=5e-4, nesterov=True, q=1.5)
         elif  args.optim == 'adamwq':
-            # optimizer = AdamWq(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay,q=1.25)
-            lr_biases = 9e-3 * 128
-            norm_biases = [p for k, p in target_net.named_parameters() if 'norm' in k and p.requires_grad]
-            other_params = [p for k, p in target_net.named_parameters() if 'norm' not in k and p.requires_grad]
-            param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=5e-4),
-                            dict(params=other_params, lr=9e-3, weight_decay=5e-4)]            
-            # optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
-            # optimizer = SMD_qnorm(grouped_parameters, lr=args.lr, q=1.5, momentum=args.momentum, nesterov=True)
-            optimizer = AdamWq(param_configs, betas=(0.9,0.999),q=1.5,eps=5e-7)
-            # optimizer = XMatP(target_net.parameters(), lr_params=2e-2, preconditioner_init_scale=None,
-            #                   grad_clip_max_norm=100,momentum=0.9,regularization=1.5,preconditioner_update_probability=0.1)            
-            
-    elif args.poison_mode == 'transfer':
+            AdamWq(target_net.parameters())
 
-        if args.fine_tune:
+    elif args.poison_mode in ['linear_transfer','fine_tine']:
+
+        if args.poison_mode == 'fine_tune':
             params = target_net.parameters()
         else:
             params = target_net.get_penultimate_params_list()
@@ -794,6 +1013,23 @@ def get_optimizer(args,target_net):
             optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     return optimizer
+
+def get_scheduler(args,optimizer,len_data):
+    if 'HLB' in args.model:
+        if args.dataset == 'cifar10':
+            total_train_steps = np.ceil(len_data * args.epochs)
+        else:
+            total_train_steps = np.ceil(len_data / args.batch_size * args.epochs) + args.epochs
+        lr_schedule = np.interp(np.arange(1+total_train_steps),
+                            [0, int(0.2 * total_train_steps), total_train_steps],
+                            [0.2, 1, 0]) # triangular learning rate schedule
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule.__getitem__)
+        if args.verbose: print(f'Loaded the HLB scheduler with {total_train_steps} steps')
+
+    else:
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay, gamma=0.1)
+
+    return scheduler
 
 #############
 # Poison Utils
@@ -808,12 +1044,12 @@ def load_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureDefense',args.dataset,'Poisons')
+    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons')
 
-    if args.poison_type == 'Gradient_Matching':
-        load_dir = os.path.join(args.data_dir, subfolder, 'Gradient_Matching')
+    if args.poison_type == 'GradientMatching':
+        load_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
-        load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}')
+        load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
         if args.fine_tune: bp_subpath = 'end2end-training'
         else: bp_subpath = 'linear-transfer-learning'
@@ -830,8 +1066,8 @@ def load_poisons(args,target_index):
     
 
 def get_poisons_target(args,target_index,test_transforms,target_mask=None):
-    if args.poison_type =='Gradient_Matching':
-        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'Poisons/Gradient_Matching/{target_index}'), test_transforms)
+    if args.poison_type =='GradientMatching':
+        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'PoisonDefense/Poisons/GradientMatching/{args.dataset}/ResNet34_250/{target_index}'), test_transforms)
         return target_img, target_orig_label
     
     elif args.poison_type == 'BullseyePolytope':
@@ -839,13 +1075,13 @@ def get_poisons_target(args,target_index,test_transforms,target_mask=None):
         return target_img, 6
     
     elif args.poison_type == 'BullseyePolytope_Bench':
-        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}'), test_transforms)
+        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'PoisonDefense/Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}'), test_transforms)
         return target_img, target_orig_label
 
     elif args.poison_type == 'Narcissus':
         # Target Test Sets
         test_trigger_loaders = {}
-        for i in range(1,4):
+        for i in range(1,3):
             test_data_trigger = get_target_narcissus(args.data_dir, args.dataset, target_mask, target_index, test_transforms, multi_test=i)
             test_trigger_loaders[i] = torch.utils.data.DataLoader(test_data_trigger, batch_size=128)
 
@@ -863,7 +1099,7 @@ def get_target_narcissus(data_dir, dataset, poison, label, transform_test, multi
     elif dataset == 'tiny-imagenet':
         test_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'tiny-imagenet-200/test'))
         test_labels = np.array(test_dataset.targets)
-    elif dataset == 'stl10':
+    elif dataset in ['stl10','stl10_64']:
         test_dataset = torchvision.datasets.STL10(root=data_dir, split='test', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
         test_labels = np.array(test_dataset.labels)
     else:
@@ -916,27 +1152,3 @@ def get_target_poison(poisons_path, transform_test):
 # Misc Data Utils
 #############
 
-class UniformNoise(object):
-    def __init__(self, eps):
-        self.eps = eps
-
-    def __call__(self, tensor):
-        out = tensor + torch.rand(tensor.size()) * self.eps * 2 -self.eps
-        return out
-
-class GaussianNoise(object):
-    def __init__(self, eps):
-        self.eps = eps
-
-    def __call__(self, tensor):
-        out = tensor + torch.randn(tensor.size()) * self.eps
-        return out
-
-class BernoulliNoise(object):
-    def __init__(self, eps):
-        self.eps = eps
-
-    def __call__(self, tensor):
-        noise = (torch.rand(tensor.size()) > 0.5).float() * 2 - 1
-        out = tensor + noise * self.eps
-        return out
