@@ -72,7 +72,7 @@ python3 purify.py --remote_user 'sunaybhat';
 ############################
 
 # Copy Models up to Node
-rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node9:/home/sunaybhat/data/PureGen_Models/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node6:/home/sunaybhat/data/PureGen_Models/;
 
 # Copy Poisons Up to Node
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/Poisons/* sunaybhat@node9:/home/sunaybhat/data/Poisons/;
