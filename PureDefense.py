@@ -15,22 +15,13 @@ try:
 except: pass
 
 from utils.EBM_models import create_ebm
-from utils.Diff_models import create_diffusion_model
-from utils.utils_purify import timestep_to_sinusoial_tensor, purify
-
-# from Diffusion.gaussian_diffusion import (
-#     GaussianDiffusion,
-#     get_named_beta_schedule,
-#     ModelMeanType,
-#     ModelVarType,
-#     LossType)
+from utils.Diff_models import create_diff
 
 class PureDefense:
     def __init__(self, device, device_type = 'xla',
                  ebm_type=None,ebm_path=None,ebm_nf=128,
                  diff_type=None,diff_path=None, diff_nf=128, 
-                 time_emb_dim=64, num_res_blocks=2,
-                #  diff_schedule='cosine', diff_train_steps=1000, diff_output='epsilon',img_sz=32,
+                 diff_mode='Eps',
                  verbose=True
                  ):
         '''
@@ -42,21 +33,22 @@ class PureDefense:
         self.diff_type = diff_type
         self.EBM = None
         self.DM = None
-        # self.diffusion = None
+        self.diff_mode = diff_mode
 
         self.forward_ebm_norm = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         self.inverse_ebm_norm = transforms.Normalize((-1, -1, -1), (2, 2, 2))
 
         if self.ebm_type is not None:
-            self.get_ebm(ebm_type, ebm_path, ebm_nf, verbose)
+            self.get_ebm(ebm_type, ebm_path, ebm_nf,verbose)
 
         if self.diff_type is not None:
-            self.get_diff(diff_type, diff_path,time_emb_dim, num_res_blocks,diff_nf)
+            self.get_diff(diff_type, diff_path,diff_nf,verbose)
             
 
     def purify(self, data_loader, 
                ebm_lang_steps=100,ebm_lang_temp=1e-4,
-               diff_steps=100, diff_eta=0,
+               diff_steps=[0,50,5], ebm_guided=False, 
+               sample_freq=10, additonal_guided_steps=None,
                purify_reps=1,
                pbar=True):
         """
@@ -82,18 +74,13 @@ class PureDefense:
             for i in range(purify_reps):
 
                 if self.EBM is not None and ebm_lang_steps > 0:
-                    print('Purifying with EBM number of steps:', ebm_lang_steps)
-                    # input = self.ebm_purify(input,
-                    #         langevin_steps=ebm_lang_steps,
-                    #         langevin_temp=ebm_lang_temp,
-                    #     ).squeeze(0)
-
-                    input = purify(input, self.EBM, langevin_steps=ebm_lang_steps)
+                    input = self.ebm_purify(input,
+                            langevin_steps=ebm_lang_steps,
+                            langevin_temp=ebm_lang_temp,
+                        ).squeeze(0)
                     
-                if self.DM is not None and diff_steps > 0:
-                    t_s = torch.ones(input.shape[0]) * diff_steps
-                    diff_predict = self.DM(input, timestep_to_sinusoial_tensor(t_s,64).to(self.device))
-                    input = input + diff_predict
+                if self.DM is not None:
+                    input = self.diff_purify(input, diff_steps, ebm_guided, ebm_lang_steps, sample_freq, additonal_guided_steps)
 
                 if self.device_type =='xla': xm.mark_step()
 
@@ -132,8 +119,6 @@ class PureDefense:
 
         X_purify = X_purify + langevin_init_noise * torch.randn_like(X_purify)
 
-        print(langevin_steps)
-
         for ell in range(langevin_steps):
             energy = self.EBM(X_purify).sum() / langevin_temp
             grad = torch.autograd.grad(energy, [X_purify], create_graph=False)[0]
@@ -144,35 +129,58 @@ class PureDefense:
 
         return X_purify
 
-    def diff_purfiy(self, X_input, diff_steps, eta=0,requires_grad=True):
+    def diff_purify(self, X_input, diff_steps=[0,50,5], ebm_guided=False, ebm_steps = None, sample_freq=10, additonal_guided_steps=None):
+        """
+        Purifies the input tensor X using the Differential Model.
 
-        # Set true for MCMC
-        if requires_grad:
-            X_purify = torch.autograd.Variable(X_input.clone(), requires_grad=True)
+        Parameters:
+        X_input (torch.Tensor): The original input tensor.
+        diff_steps (list, optional): The number of steps for the diffusion model. Defaults to [0,50,5].
+        ebm_guided (bool, optional): If True, the diffusion model is guided by the EBM. Defaults to False.
+        ebm_steps (int, optional): The number of EBM purify steps inputs has was processed with.
+        sample_freq (int, optional): The frequency of step subsampling for EBm guided diffusion. Defaults to 10.
+        additonal_guided_steps (list, optional): Additional guided steps for the diffusion model. Defaults to None.
 
-        if self.diff_type == 'DDPM_UNET_EBM':
-            # condition augmentation
-            x_samp_con = X_purify.clone()
-            model_kwargs = {"low_res": x_samp_con}
-        else:
-            model_kwargs = {}
-            
-        if self.diff_type in ('HF_DDPM_UNET', 'DDPM_UNET'):
-            t_start = torch.tensor(X_purify.shape[0] * [diff_steps]).long().to(device=self.device)
-            x_t = self.diffusion.q_sample(X_purify, t_start)
-            x_0 = self.diffusion.ddim_sample_loop_partial(self.Diff, x_t, diff_steps, model_kwargs=model_kwargs)
+        Returns:
+        torch.Tensor: The purified tensor.
+        """
+        diff_predict = X_input
 
-        elif self.diff_type in ('DDPM_UNET_EBM'):
-            if diff_steps>0:
-                x_0 = self.diffusion.ddim_sample_loop_partial(self.Diff, X_purify, diff_steps, model_kwargs=model_kwargs)
+        if ebm_guided:
+            t = ebm_steps // sample_freq
+
+            if additonal_guided_steps is not None:
+                timesteps = [t] + additonal_guided_steps
             else:
-                x_0 = self.diffusion.ddim_sample_loop(self.Diff, X_purify.shape, model_kwargs=model_kwargs, eta = eta)  
+                timesteps = [t]
+
+            for step in timesteps:
+                t_s = torch.tensor([step] * diff_predict.shape[0], device=self.device)
+
+                model_output = self.DM(diff_predict, t_s)
+
+                if self.diff_mode == 'Eps':
+                    diff_predict = model_output + diff_predict
+                elif self.diff_mode == 'X0':
+                    diff_predict = model_output
+
+                if self.device_type == 'xla': xm.mark_step()
         else:
-            raise ValueError('defense model and net_type must match')     
+            timesteps = list(range(diff_steps[0], diff_steps[1], diff_steps[2]))
+            timesteps.sort(reverse=True)
 
-        if self.device_type =='xla': xm.mark_step()
+            for step in timesteps:
+                t_s = torch.tensor([step] * diff_predict.shape[0], device=self.device)
+                model_output = self.DM(X_input, t_s)
 
-        return x_0
+                if self.diff_mode == 'Eps':
+                    diff_predict = model_output + X_input
+                elif self.diff_mode == 'X0':
+                    diff_predict = model_output
+
+                if self.device_type == 'xla': xm.mark_step()
+
+        return diff_predict
 
     def get_ebm(self, ebm_type, ebm_path, nf=128, verbose=True):
         """
@@ -199,14 +207,13 @@ class PureDefense:
         # Move the EBM model to the device
         self.EBM = self.EBM.to(self.device)
 
-        if verbose: print(f'Loaded {ebm_type} from {ebm_path}')
+        if verbose:
+            num_params = sum(p.numel() for p in self.EBM.parameters() if p.requires_grad)
+            print(f'Loaded {ebm_type} from {ebm_path} with {num_params} parameters')
     
     def get_diff(self, diff_type, diff_path,
-                time_emb_dim=64, num_res_blocks=2,
-                 nf=128, channels=3,
-                #  diff_schedule, diff_steps,
-                #  diff_output='epsilon',
-                  verbose=True):
+                 nf=128, im_sz=32,channel_mult=(1,2,2,2),num_res_blocks=2,
+                  verbose=True): # channels=3,
         """
         Loads a Differential Model from a specified path.
 
@@ -222,25 +229,16 @@ class PureDefense:
         """
 
         # Create the Differential model
-        self.DM = create_diffusion_model(diff_type,channels,channels,time_emb_dim=time_emb_dim, num_res_blocks=num_res_blocks, nf=nf)
+        self.DM = create_diff(diff_type,nf=nf,im_sz=im_sz,channel_mult=channel_mult,num_res_blocks=num_res_blocks)
         self.diff_type = diff_type
 
-        # Load the state dictionary of the Differential model
+        # Load the state dictionary of the Diffusion model
         state_dict = torch.load(diff_path, map_location=torch.device('cpu'))
         self.DM.load_state_dict(state_dict)
 
         # Move the Diffusion model to the device
         self.DM = self.DM.to(self.device)
 
-        # betas = get_named_beta_schedule(diff_schedule,diff_steps)                            
-        # self.diffusion = GaussianDiffusion(
-        #                     betas=betas,
-        #                     model_mean_type=(
-        #                         ModelMeanType.EPSILON if diff_output == 'epsilon'
-        #                         else ModelMeanType.START_X
-        #                     ),
-        #                     model_var_type=ModelVarType.FIXED_LARGE,
-        #                     loss_type=LossType.MSE
-        #                 )
-
-        if verbose: print(f'Loaded {diff_type} from {diff_path}')
+        if verbose:
+            num_params = sum(p.numel() for p in self.DM.parameters() if p.requires_grad)    
+            print(f'Loaded {diff_type} from {diff_path} with {num_params} parameters')

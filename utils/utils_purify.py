@@ -368,92 +368,92 @@ def timestep_to_sinusoial_tensor(timesteps, n):
     return sinusoidal_tensor
 
 
-def ebm_purify(ebm_model,X_input,langevin_steps,langevin_temp=1e-4):
-    """
-    Purifies the input tensor X using the Energy-Based Model (EBM).
+# def ebm_purify(ebm_model,X_input,langevin_steps,langevin_temp=1e-4):
+#     """
+#     Purifies the input tensor X using the Energy-Based Model (EBM).
 
-    Parameters:
-    ebm_model (torch.nn.Module): The Energy-Based Model.
-    X_input (torch.Tensor): The input tensor to be purified.
-    langevin_steps (int, optional): The number of Langevin steps for the EBM. Defaults to 20.
-    langevin_temp (float, optional): The temperature for the Langevin dynamics. Defaults to 1e-4.
-    requires_grad (bool, optional): If True, the input tensor X is cloned and requires gradient. Defaults to True.
+#     Parameters:
+#     ebm_model (torch.nn.Module): The Energy-Based Model.
+#     X_input (torch.Tensor): The input tensor to be purified.
+#     langevin_steps (int, optional): The number of Langevin steps for the EBM. Defaults to 20.
+#     langevin_temp (float, optional): The temperature for the Langevin dynamics. Defaults to 1e-4.
+#     requires_grad (bool, optional): If True, the input tensor X is cloned and requires gradient. Defaults to True.
 
-    Returns:
-    torch.Tensor: The purified tensor.
-    """
+#     Returns:
+#     torch.Tensor: The purified tensor.
+#     """
 
-    # EBM Update
-    langevin_init_noise = 0.0
-    langevin_eps = 1.25e-2
+#     # EBM Update
+#     langevin_init_noise = 0.0
+#     langevin_eps = 1.25e-2
 
-    # Set true for MCMC
-    X_purify = torch.autograd.Variable(X_input.clone(), requires_grad=True)
+#     # Set true for MCMC
+#     X_purify = torch.autograd.Variable(X_input.clone(), requires_grad=True)
 
-    X_purify = X_purify + langevin_init_noise * torch.randn_like(X_purify)
+#     X_purify = X_purify + langevin_init_noise * torch.randn_like(X_purify)
 
-    for ell in range(langevin_steps):
-        energy = ebm_model(X_purify).sum() / langevin_temp
-        grad = torch.autograd.grad(energy, [X_purify], create_graph=False)[0]
-        X_purify.data -= ((langevin_eps ** 2) / 2) * grad
-        X_purify.data += langevin_eps* torch.randn_like(grad)
-        xm.mark_step()
-    xm.mark_step()
+#     for ell in range(langevin_steps):
+#         energy = ebm_model(X_purify).sum() / langevin_temp
+#         grad = torch.autograd.grad(energy, [X_purify], create_graph=False)[0]
+#         X_purify.data -= ((langevin_eps ** 2) / 2) * grad
+#         X_purify.data += langevin_eps* torch.randn_like(grad)
+#         xm.mark_step()
+#     xm.mark_step()
 
-    return X_purify
+#     return X_purify
 
 
-def ebm_update(ebm_model, X, langevin_steps , mcmc_temp, requires_grad=False, device_type='xla'):
-    langevin_init_noise = 0.0
-    langevin_eps = 1.25e-2
+# def ebm_update(ebm_model, X, langevin_steps , mcmc_temp, requires_grad=False, device_type='xla'):
+#     langevin_init_noise = 0.0
+#     langevin_eps = 1.25e-2
 
-    if not X.requires_grad:
-        X = torch.autograd.Variable(X.clone(), requires_grad=True)
-        return_autograd_var = False
-        if device_type =='xla': xm.mark_step()
-    else:
-        return_autograd_var = True
+#     if not X.requires_grad:
+#         X = torch.autograd.Variable(X.clone(), requires_grad=True)
+#         return_autograd_var = False
+#         if device_type =='xla': xm.mark_step()
+#     else:
+#         return_autograd_var = True
 
-    X = X + langevin_init_noise * torch.randn_like(X)
+#     X = X + langevin_init_noise * torch.randn_like(X)
 
-    for ell in range(langevin_steps):
-        energy = ebm_model(X).sum() / mcmc_temp
-        grad = torch.autograd.grad(energy, [X], create_graph=requires_grad)[0]
-        if requires_grad:
-            X = X - ((langevin_eps ** 2) / 2) * grad
-            X = X + langevin_eps* torch.randn_like(grad)
-        else:
-            X.data -= ((langevin_eps ** 2) / 2) * grad
-            X.data += langevin_eps* torch.randn_like(grad)
-        if device_type =='xla': xm.mark_step()
-    if device_type =='xla': xm.mark_step()
+#     for ell in range(langevin_steps):
+#         energy = ebm_model(X).sum() / mcmc_temp
+#         grad = torch.autograd.grad(energy, [X], create_graph=requires_grad)[0]
+#         if requires_grad:
+#             X = X - ((langevin_eps ** 2) / 2) * grad
+#             X = X + langevin_eps* torch.randn_like(grad)
+#         else:
+#             X.data -= ((langevin_eps ** 2) / 2) * grad
+#             X.data += langevin_eps* torch.randn_like(grad)
+#         if device_type =='xla': xm.mark_step()
+#     if device_type =='xla': xm.mark_step()
 
-    if not return_autograd_var:
-        X = X.detach()
-    return X
+#     if not return_autograd_var:
+#         X = X.detach()
+#     return X
 
-def purify(X, ebm_model, purify_reps=1, reps_mode='repeat', langevin_steps=20, langevin_temp=1e-4, requires_grad=True, device_type='xla'):
+# def purify(X, ebm_model, purify_reps=1, reps_mode='repeat', langevin_steps=20, langevin_temp=1e-4, requires_grad=True, device_type='xla'):
 
-    batch_size = X.shape[0]
+#     batch_size = X.shape[0]
 
-    # Repeat X for Purify Reps
-    X_repeat = X.repeat([purify_reps, 1, 1, 1])
+#     # Repeat X for Purify Reps
+#     X_repeat = X.repeat([purify_reps, 1, 1, 1])
 
-    # Set true for MCMC
-    requires_grad = True
-    if requires_grad:
-        X_repeat = torch.autograd.Variable(X_repeat.clone(), requires_grad=True)
+#     # Set true for MCMC
+#     requires_grad = True
+#     if requires_grad:
+#         X_repeat = torch.autograd.Variable(X_repeat.clone(), requires_grad=True)
 
-    X_purify = ebm_update(ebm_model, X_repeat, langevin_steps, langevin_temp, requires_grad=False, device_type=device_type)
+#     X_purify = ebm_update(ebm_model, X_repeat, langevin_steps, langevin_temp, requires_grad=False, device_type=device_type)
 
-    if device_type =='xla': xm.mark_step()
+#     if device_type =='xla': xm.mark_step()
 
-    # Avg if needed
-    if reps_mode == 'mean':
-        X_purify = X_purify.view(purify_reps, batch_size, X.shape[1], X.shape[2], X.shape[3])
-        X_purify = torch.mean(X_purify, dim=0, keepdim=False)
-    elif reps_mode == 'median':
-        X_purify = X_purify.view(purify_reps, batch_size, X.shape[1], X.shape[2], X.shape[3])
-        X_purify = torch.median(X_purify, dim=0, keepdim=False)[0]
+#     # Avg if needed
+#     if reps_mode == 'mean':
+#         X_purify = X_purify.view(purify_reps, batch_size, X.shape[1], X.shape[2], X.shape[3])
+#         X_purify = torch.mean(X_purify, dim=0, keepdim=False)
+#     elif reps_mode == 'median':
+#         X_purify = X_purify.view(purify_reps, batch_size, X.shape[1], X.shape[2], X.shape[3])
+#         X_purify = torch.median(X_purify, dim=0, keepdim=False)[0]
 
-    return X_purify
+#     return X_purify

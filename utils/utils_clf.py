@@ -122,9 +122,8 @@ def get_train_data(args,target_index,device):
         train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,num_workers=4)
 
     # Print training data details
-    if args.verbose:
-        if args.poison_mode == 'clean' or args.poison_type == 'Neural_Tangent': p_count = 0
-        else: p_count = sum(p.sum().item() for _, _, _, p in train_loader)
+    if args.poison_mode == 'clean' or args.poison_type == 'Neural_Tangent': p_count = 0
+    else: p_count = sum(p.sum().item() for _, _, _, p in train_loader)
 
     if args.baseline_defense == 'Friendly':
         
