@@ -80,7 +80,7 @@ def main(rank, args):
                 train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=torchvision.transforms.ToTensor())
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         elif args.poison_type == 'NeuralTangent':
-            train_data = get_ntg(os.path.join(args.data_dir,'Poisons'),True, transform=torchvision.transforms.ToTensor(),jpeg=args.jpeg)
+            train_data = get_ntg(os.path.join(args.data_dir,'Poisons/NTG'),True, transform=torchvision.transforms.ToTensor())
             train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)

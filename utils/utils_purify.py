@@ -328,7 +328,7 @@ class AdvDataSet(torch.utils.data.Dataset):
         return image, label   
 
 
-def get_ngt(data_root,train=True,transform=transforms.Compose([transforms.ToTensor()])):
+def get_ntg(data_root,train=True,transform=transforms.Compose([transforms.ToTensor()])):
 
     if train:
         x_train = os.path.join(data_root, 'x_train_cifar10_ntga_cnn_best.npy')
