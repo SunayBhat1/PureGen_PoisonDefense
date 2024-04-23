@@ -21,7 +21,6 @@ except: pass
 from utils.utils import *
 from utils.utils_clf import *
 from utils.utils_baselines import *
-from utils.utils_optim import AdamWq, SMD_qnorm
 
 def main(rank, args):
 
@@ -260,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('--remote_user', type=str, help='username for the remote server (TPU only, else pass in full directory args below)')
     parser.add_argument('--num_proc', type=int, default=8, help='number of processes for TPU')
     parser.add_argument('--config_file', default='./Configs/config.ini', type=str, help='path to the config file')
-    parser.add_argument('--config_override', default=None, type=str, help='use this to override the specific config settings with a ini section')
+    parser.add_argument('--config_overrides', default=None, nargs='+', type=str, help='Config Overrides (will execute in order)')
     parser.add_argument('--exp_name', default=None, type=str,help='name of the experiment to append to the output dataframe')
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
@@ -279,7 +278,6 @@ if __name__ == '__main__':
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
 
     ### Baseline Defense Arguments ###
-    parser.add_argument('--jpeg_quality', default=75, type=int, help='quality of the JPEG compression')
     parser.add_argument('--friendly_noise_type', default=['friendly','bernoulli'], type=str, nargs='*', help='type of noise to apply', choices=["uniform", "gaussian", "bernoulli", "gaussian_blur", "friendly"])
     parser.add_argument('--epic_subset_size', type=float, help='size of the subset', default=0.1)
     parser.add_argument('--epic_drop_after', type=int, help='epoch to start dropping', default=10)
@@ -296,7 +294,9 @@ if __name__ == '__main__':
     set_args_from_config(args, config, 'DEFAULTS')
     if args.poison_mode == 'linear' and not args.fine_tune: set_args_from_config(args, config, 'LINEAR_TRANSFER')
     elif args.poison_mode == 'fine_tune' and args.fine_tune: set_args_from_config(args, config, 'FINE_TUNE')
-    if args.config_override is not None: set_args_from_config(args, config, args.config_override)
+    if args.config_overrides is not None:
+        for config_override in args.config_overrides:
+            set_args_from_config(args, config, config_override)
 
     ### Error Checking
     check_arg_errors(args)

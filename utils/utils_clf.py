@@ -18,7 +18,7 @@ try: import torch_xla.core.xla_model as xm
 except: pass
 
 from utils.clf_models import load_model
-from utils.utils_optim import AdamWq, SMD_qnorm
+from utils.utils_optim import AdamWq, SMD
 
 #############
 # Variables #
@@ -959,14 +959,9 @@ def load_target_network(args,device):
 def get_optimizer(args,target_net):
 
     if args.poison_mode in ['from_scratch','clean']:
-
-        if args.model == 'ResNet18_HLB':
-            optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
-                                weight_decay=args.weight_decay*args.batch_size)
-            
-            return optimizer
         
-        elif args.model in ['HLB_S','HLB_M','HLB_L']:
+        ### HLB Optimizers ###
+        if args.model in ['HLB_S','HLB_M','HLB_L']:
             kilostep_scale = 1024 * (1 + 1 / (1 - args.momentum))
             lr = args.lr / kilostep_scale # un-decoupled learning rate for PyTorch SGD
             wd = args.weight_decay * args.batch_size / kilostep_scale
@@ -977,7 +972,15 @@ def get_optimizer(args,target_net):
             param_configs = [dict(params=norm_biases, lr=lr_biases, weight_decay=wd/lr_biases),
                             dict(params=other_params, lr=lr, weight_decay=wd/lr)]
             optimizer = torch.optim.SGD(param_configs, momentum=args.momentum, nesterov=True)    
-            
+
+        ### Standard Optimizers ###
+        elif args.optim == 'sgd':
+            if args.model == 'ResNet18_HLB':
+                optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr/args.batch_size, momentum=args.momentum, nesterov=True,
+                                    weight_decay=args.weight_decay*args.batch_size)
+            else:
+                optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
         elif args.optim == 'adam':
             optimizer = torch.optim.Adam(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
@@ -991,13 +994,12 @@ def get_optimizer(args,target_net):
             ]
             optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr, momentum=args.momentum, nesterov=True)
 
-        elif args.optim == 'sgd':
-            optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
         elif args.optim == 'smd':
-            SMD_qnorm(target_net.parameters(), lr=0.2, momentum=0.9, weight_decay=5e-4, nesterov=True, q=1.5)
-        elif  args.optim == 'adamwq':
-            AdamWq(target_net.parameters())
+            SMD(target_net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay,q=args.q, nesterov=args.nesterov)
+
+        elif args.optim == 'adamwq':
+            xm.master_print(f'Using AdamWq with q={args.q} and weight decay={args.weight_decay} lr={args.lr}')
+            optimizer = AdamWq(target_net.parameters(), lr=args.lr,weight_decay=args.weight_decay,q=args.q)
 
     elif args.poison_mode in ['linear_transfer','fine_tine']:
 

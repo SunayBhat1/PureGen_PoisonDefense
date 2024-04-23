@@ -1,32 +1,28 @@
-import os
-import time
+import torch
+import torchvision.transforms as transforms
+import io
+from PIL import Image
 from tqdm import tqdm
 
-import numpy as np
-import pandas as pd
-import torchvision.transforms as transforms
-import torchvision
-import torch
-import torch.nn as nn
-
-try: 
-    import torch_xla.core.xla_model as xm
-    import torch_xla.distributed.xla_multiprocessing as xmp
+try: import torch_xla.core.xla_model as xm
 except: pass
 
 from utils.EBM_models import create_ebm
 from utils.Diff_models import create_diff
+from diffusers import UNet2DModel, DDPMScheduler
+
 
 class PureDefense:
     def __init__(self, device, device_type = 'xla',
                  ebm_type=None,ebm_path=None,ebm_nf=128,
-                 diff_type=None,diff_path=None, diff_nf=128, 
-                 diff_mode='Eps',
+                 diff_type=None,diff_path=None, diff_nf=128, diff_mode='Eps',
+                 jpeg_compression=None,
                  verbose=True
                  ):
         '''
         '''
 
+        # Store Arguments
         self.device = device
         self.device_type = device_type
         self.ebm_type = ebm_type
@@ -34,15 +30,17 @@ class PureDefense:
         self.EBM = None
         self.DM = None
         self.diff_mode = diff_mode
+        if jpeg_compression is not None and not isinstance(jpeg_compression, int):
+            raise TypeError("jpeg_compression must be None or an int")
+        self.jpeg_compression = jpeg_compression
 
+        # Normalizations for the input and output tensors
         self.forward_ebm_norm = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         self.inverse_ebm_norm = transforms.Normalize((-1, -1, -1), (2, 2, 2))
 
-        if self.ebm_type is not None:
-            self.get_ebm(ebm_type, ebm_path, ebm_nf,verbose)
-
-        if self.diff_type is not None:
-            self.get_diff(diff_type, diff_path,diff_nf,verbose)
+        # Load the EBM and Diffusion models
+        if self.ebm_type is not None: self.get_ebm(ebm_type, ebm_path, ebm_nf,verbose)
+        if self.diff_type is not None: self.get_diff(diff_type, diff_path,diff_nf,verbose)
             
 
     def purify(self, data_loader, 
@@ -69,6 +67,9 @@ class PureDefense:
 
         for input, target in data_loader:
 
+            if self.jpeg_compression is not None:
+                input = self.jpeg_compress_batch(input)
+
             input = self.forward_ebm_norm(input).to(self.device)
 
             for i in range(purify_reps):
@@ -80,7 +81,10 @@ class PureDefense:
                         ).squeeze(0)
                     
                 if self.DM is not None:
-                    input = self.diff_purify(input, diff_steps, ebm_guided, ebm_lang_steps, sample_freq, additonal_guided_steps)
+                    if self.diff_type == 'HF_DDPM':
+                        input = self.diff_ddpm_purify(input,diff_steps)
+                    else:
+                        input = self.diff_purify(input, diff_steps, ebm_guided, ebm_lang_steps, sample_freq, additonal_guided_steps)
 
                 if self.device_type =='xla': xm.mark_step()
 
@@ -182,6 +186,63 @@ class PureDefense:
 
         return diff_predict
 
+    def diff_ddpm_purify(self, X_input,diff_steps,reverse_only=False):
+        """
+        Purifies the input tensor X using the HF-DDPM model.
+
+        Parameters:
+        X_input (torch.Tensor): The original input tensor.
+
+        Returns:
+        torch.Tensor: The purified tensor.
+        """
+
+        if reverse_only:
+            forward_images = X_input
+        else:
+            forward_images = self.scheduler.add_noise(X_input,torch.randn(X_input.shape),timesteps = torch.LongTensor([diff_steps])).to(self.device)
+
+        reverse_images = forward_images.clone()
+
+        for i, t in enumerate(self.scheduler.timesteps[-diff_steps:]):
+            # 1. predict noise residual
+            with torch.no_grad():
+                residual = self.DM(reverse_images, t).sample
+
+            # 2. compute previous image and set x_t -> x_t-1
+            reverse_images = self.scheduler.step(residual, t, reverse_images).prev_sample
+
+            xm.mark_step()
+        
+        return reverse_images
+
+    def jpeg_compress_batch(self, batch):
+        """
+        Compresses the input batch of images using JPEG compression.
+
+        Parameters:
+        batch (torch.Tensor): The input batch of images.
+
+        Returns:
+        torch.Tensor: The compressed batch of images.
+        """
+
+        # Convert the batch to PIL images
+        batch = [transforms.ToPILImage()(img) for img in list(torch.unbind(batch, dim=0))]
+
+        # Compress the images using JPEG compression
+        compressed_batch = []
+        for img in batch:
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=self.jpeg_compression)
+            img = Image.open(buffer)
+            compressed_batch.append(img)
+
+        # Convert the compressed images to tensors
+        batch = [transforms.ToTensor()(img).unsqueeze(0) for img in compressed_batch]
+
+        return torch.stack(batch)
+
     def get_ebm(self, ebm_type, ebm_path, nf=128, verbose=True):
         """
         Loads an Energy-Based Model (EBM) from a specified path.
@@ -228,16 +289,23 @@ class PureDefense:
         None. The method directly modifies the `self.Diff` attribute of the class instance.
         """
 
-        # Create the Differential model
-        self.DM = create_diff(diff_type,nf=nf,im_sz=im_sz,channel_mult=channel_mult,num_res_blocks=num_res_blocks)
-        self.diff_type = diff_type
+        if diff_type == 'HF_DDPM':
+            self.DM = UNet2DModel.from_pretrained(diff_path)
+            self.DM = self.DM.to(self.device)
 
-        # Load the state dictionary of the Diffusion model
-        state_dict = torch.load(diff_path, map_location=torch.device('cpu'))
-        self.DM.load_state_dict(state_dict)
+            self.scheduler = DDPMScheduler.from_pretrained(diff_path)
+        else:
 
-        # Move the Diffusion model to the device
-        self.DM = self.DM.to(self.device)
+            # Create the Differential model
+            self.DM = create_diff(diff_type,nf=nf,im_sz=im_sz,channel_mult=channel_mult,num_res_blocks=num_res_blocks)
+            self.diff_type = diff_type
+
+            # Load the state dictionary of the Diffusion model
+            state_dict = torch.load(diff_path, map_location=torch.device('cpu'))
+            self.DM.load_state_dict(state_dict)
+
+            # Move the Diffusion model to the device
+            self.DM = self.DM.to(self.device)
 
         if verbose:
             num_params = sum(p.numel() for p in self.DM.parameters() if p.requires_grad)    

@@ -68,7 +68,31 @@ def get_device(device_type='xla'):
         return torch.device("cpu")
     else:
         raise ValueError('device_type must be xla or cuda or cpu')
+
+def save_purify_time(data_key, purify_time,args, save_path, file_name = 'PurifyTimes.csv'):
+    # Check if the directory exists, create it if it doesn't
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    file_path = os.path.join(save_path, file_name)
+
+    # Check if the file exists
+    if os.path.isfile(file_path):
+        # If the file exists, load the existing data
+        df = pd.read_csv(file_path)
+    else:
+        # If the file doesn't exist, create a new dataframe
+        df = pd.DataFrame(columns=['Data Key','Dataset','Purify Time','Args'])
+
+    # Append results to the dataframe
+    df = pd.concat([df, pd.DataFrame({'Data Key': data_key, 
+                                      'Dataset': args.dataset,
+                                      'Purify Time': purify_time,
+                                      'Args': json.dumps(vars(args))}, 
+                                      index=[0])], ignore_index=True)
     
+    # Save the dataframe
+    df.to_csv(file_path, index=False)
 
 def check_training_end(args,target_index):
     if args.poison_type == 'Narcissus' and target_index >= 10: 
