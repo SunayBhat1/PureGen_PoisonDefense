@@ -241,11 +241,6 @@ class PureDefense:
             self.DM = self.DM.to(self.device)
 
             self.scheduler = DDPMScheduler.from_pretrained('google/ddpm-cifar10-32')
-        elif diff_type == 'HF_NCSNPP_PRE':
-            self.DM = UNet2DModel.from_pretrained("google/ncsnpp-ffhq-1024")
-            self.DM = self.DM.to(self.device)
-
-            self.scheduler = ScoreSdeVeScheduler.from_pretrained("google/ncsnpp-ffhq-1024")
         else:
 
             # Create the Differential model
