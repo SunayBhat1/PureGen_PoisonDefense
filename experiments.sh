@@ -2,27 +2,27 @@
 # Nodes Lists #
 ###############
 
-# Check Jpeg integration
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --jpeg_compression 85;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --jpeg_compression 75 --poison_type 'NeuralTangent';
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --jpeg_compression 75 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --jpeg_compression 75 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-
-for i in 25 50 75 85
-do
-    python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --jpeg_compression $i;
-    python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --jpeg_compression $i --poison_type 'Narcissus';
-    python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --jpeg_compression $i --poison_type 'Narcissus' --noise_eps_narcissus 16;
-done
-
-
 
 ####################
 # Purificatiion #
 ####################
 
 # Base Dataset
-python3 purify.py --remote_user 'sunaybhat'; # --ebm_model None --diff_model None ## To remove either model
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 175,50,75,100,125,150 --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 175,50,75,100,125,150 --num_proc 8 --poison_type 'NeuralTangent';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 175,50,75,100,125,150 --num_proc 8 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 175,50,75,100,125,150 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+
+## Train Classifiers
+for i in 50 75 100 125 150 175; do python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cinic10_imagenet_DDPM[150]_nf[(32, 32, 64, 64, 128, 128)]]_T[$i]"; done;
+
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 20,10,10 --num_proc 8;
+
+for i in 75 100 125 150 175; do 
+    python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T $i --poison_type 'Narcissus';
+    python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T $i --poison_type 'Narcissus' --noise_eps_narcissus 16;
+done;
 
 # Poisons
 --poison_type 'Narcissus' # --noise_eps_narcissus 16
@@ -38,7 +38,7 @@ python3 purify.py --remote_user 'sunaybhat'; # --ebm_model None --diff_model Non
 ############################
 
 # Copy Models up to Node
-rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node6:/home/sunaybhat/data/PureGen_Models/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node1:/home/sunaybhat/data/PureGen_Models/;
 
 # Copy Poisons Up to Node
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/Poisons/* sunaybhat@node3:/home/sunaybhat/data/Poisons/;

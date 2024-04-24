@@ -9,13 +9,14 @@ except: pass
 
 from utils.EBM_models import create_ebm
 from utils.Diff_models import create_diff
-from diffusers import UNet2DModel, DDPMScheduler
+from diffusers import UNet2DModel, DDPMScheduler, ScoreSdeVeScheduler
 
 
 class PureDefense:
     def __init__(self, device, device_type = 'xla',
                  ebm_type=None,ebm_path=None,ebm_nf=128,
-                 diff_type=None,diff_path=None, diff_nf=128, diff_mode='Eps',
+                 diff_type=None,diff_path=None, 
+                 diff_unet_channels=None,diff_nf=64,
                  jpeg_compression=None,
                  verbose=True
                  ):
@@ -29,7 +30,6 @@ class PureDefense:
         self.diff_type = diff_type
         self.EBM = None
         self.DM = None
-        self.diff_mode = diff_mode
         if jpeg_compression is not None and not isinstance(jpeg_compression, int):
             raise TypeError("jpeg_compression must be None or an int")
         self.jpeg_compression = jpeg_compression
@@ -40,7 +40,7 @@ class PureDefense:
 
         # Load the EBM and Diffusion models
         if self.ebm_type is not None: self.get_ebm(ebm_type, ebm_path, ebm_nf,verbose)
-        if self.diff_type is not None: self.get_diff(diff_type, diff_path,diff_nf,verbose)
+        if self.diff_type is not None: self.get_diff(diff_type, diff_path, diff_unet_channels,nf=diff_nf,verbose=verbose)
             
 
     def purify(self, data_loader, 
@@ -81,12 +81,11 @@ class PureDefense:
                         ).squeeze(0)
                     
                 if self.DM is not None:
-                    if self.diff_type == 'HF_DDPM':
-                        input = self.diff_ddpm_purify(input,diff_steps)
-                    else:
-                        input = self.diff_purify(input, diff_steps, ebm_guided, ebm_lang_steps, sample_freq, additonal_guided_steps)
+                    input = self.diff_purify(input,diff_steps)
 
                 if self.device_type =='xla': xm.mark_step()
+
+            if self.device_type =='xla': xm.mark_step()
 
             input = self.inverse_ebm_norm(input)
 
@@ -133,60 +132,7 @@ class PureDefense:
 
         return X_purify
 
-    def diff_purify(self, X_input, diff_steps=[0,50,5], ebm_guided=False, ebm_steps = None, sample_freq=10, additonal_guided_steps=None):
-        """
-        Purifies the input tensor X using the Differential Model.
-
-        Parameters:
-        X_input (torch.Tensor): The original input tensor.
-        diff_steps (list, optional): The number of steps for the diffusion model. Defaults to [0,50,5].
-        ebm_guided (bool, optional): If True, the diffusion model is guided by the EBM. Defaults to False.
-        ebm_steps (int, optional): The number of EBM purify steps inputs has was processed with.
-        sample_freq (int, optional): The frequency of step subsampling for EBm guided diffusion. Defaults to 10.
-        additonal_guided_steps (list, optional): Additional guided steps for the diffusion model. Defaults to None.
-
-        Returns:
-        torch.Tensor: The purified tensor.
-        """
-        diff_predict = X_input
-
-        if ebm_guided:
-            t = ebm_steps // sample_freq
-
-            if additonal_guided_steps is not None:
-                timesteps = [t] + additonal_guided_steps
-            else:
-                timesteps = [t]
-
-            for step in timesteps:
-                t_s = torch.tensor([step] * diff_predict.shape[0], device=self.device)
-
-                model_output = self.DM(diff_predict, t_s)
-
-                if self.diff_mode == 'Eps':
-                    diff_predict = model_output + diff_predict
-                elif self.diff_mode == 'X0':
-                    diff_predict = model_output
-
-                if self.device_type == 'xla': xm.mark_step()
-        else:
-            timesteps = list(range(diff_steps[0], diff_steps[1], diff_steps[2]))
-            timesteps.sort(reverse=True)
-
-            for step in timesteps:
-                t_s = torch.tensor([step] * diff_predict.shape[0], device=self.device)
-                model_output = self.DM(X_input, t_s)
-
-                if self.diff_mode == 'Eps':
-                    diff_predict = model_output + X_input
-                elif self.diff_mode == 'X0':
-                    diff_predict = model_output
-
-                if self.device_type == 'xla': xm.mark_step()
-
-        return diff_predict
-
-    def diff_ddpm_purify(self, X_input,diff_steps,reverse_only=False):
+    def diff_purify(self, X_input,diff_steps,reverse_only=False):
         """
         Purifies the input tensor X using the HF-DDPM model.
 
@@ -267,13 +213,14 @@ class PureDefense:
 
         # Move the EBM model to the device
         self.EBM = self.EBM.to(self.device)
+        self.EBM.eval()
 
         if verbose:
             num_params = sum(p.numel() for p in self.EBM.parameters() if p.requires_grad)
             print(f'Loaded {ebm_type} from {ebm_path} with {num_params} parameters')
     
     def get_diff(self, diff_type, diff_path,
-                 nf=128, im_sz=32,channel_mult=(1,2,2,2),num_res_blocks=2,
+                 unet_channels=(32, 32, 64, 64, 128, 128),nf=64,num_res_blocks=2,
                   verbose=True): # channels=3,
         """
         Loads a Differential Model from a specified path.
@@ -289,23 +236,32 @@ class PureDefense:
         None. The method directly modifies the `self.Diff` attribute of the class instance.
         """
 
-        if diff_type == 'HF_DDPM':
-            self.DM = UNet2DModel.from_pretrained(diff_path)
+        if diff_type == 'DM_DDPM_PRE':
+            self.DM = UNet2DModel.from_pretrained('google/ddpm-cifar10-32')
             self.DM = self.DM.to(self.device)
 
-            self.scheduler = DDPMScheduler.from_pretrained(diff_path)
+            self.scheduler = DDPMScheduler.from_pretrained('google/ddpm-cifar10-32')
+        elif diff_type == 'HF_NCSNPP':
+            self.DM = UNet2DModel.from_pretrained("google/ncsnpp-ffhq-1024")
+            self.DM = self.DM.to(self.device)
+
+            self.scheduler = ScoreSdeVeScheduler.from_pretrained("google/ncsnpp-ffhq-1024")
         else:
 
             # Create the Differential model
-            self.DM = create_diff(diff_type,nf=nf,im_sz=im_sz,channel_mult=channel_mult,num_res_blocks=num_res_blocks)
+            self.DM = create_diff(diff_type, unet_channels, nf, num_res_blocks=num_res_blocks)
             self.diff_type = diff_type
 
             # Load the state dictionary of the Diffusion model
             state_dict = torch.load(diff_path, map_location=torch.device('cpu'))
             self.DM.load_state_dict(state_dict)
 
+            # Scheduler for DDPM
+            self.scheduler = DDPMScheduler(num_train_timesteps=1000)
+
             # Move the Diffusion model to the device
             self.DM = self.DM.to(self.device)
+            self.DM.eval()
 
         if verbose:
             num_params = sum(p.numel() for p in self.DM.parameters() if p.requires_grad)    

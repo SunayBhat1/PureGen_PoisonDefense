@@ -25,6 +25,9 @@ def main(rank, args):
 
     # Process the arguments for each rank
     args = process_args(args,rank)
+    if args is None: 
+        xm.rendezvous('purification end!')
+        return
 
     # Get the data loader and number of target indices
     if args.poison_type in [None,'NeuralTangent']:
@@ -49,14 +52,14 @@ def main(rank, args):
     if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'PureGen_Models',args.ebm_model,args.ebm_name+'.pt')
     else: ebm_path = None
     
-    if args.diff_model == 'HF_DDPM': diff_path = args.diff_name
-    elif args.diff_model is None: diff_path = None
+    if args.diff_model is None: diff_path = None
     else: diff_path = os.path.join(args.data_dir,'PureGen_Models',args.diff_model,args.diff_name+'.pt')
 
     # Create the PureDefense object
     PurifyClass = PureDefense(device,args.device_type,
                             ebm_type=args.ebm_model,ebm_path=ebm_path,ebm_nf=args.ebm_nf,                   # EBM Model
-                            diff_type=args.diff_model,diff_path=diff_path,diff_nf=args.diff_nf,             # Diffusion Model
+                            diff_type=args.diff_model,diff_path=diff_path,                                  # Diffusion Model
+                            diff_unet_channels=args.unet_channels,diff_nf=args.diff_nf,                     # Diffusion Model
                             jpeg_compression=args.jpeg_compression,                                         # JPEG Compression
                             verbose=args.verbose)
     
@@ -136,6 +139,8 @@ def main(rank, args):
             pbar.update(1)
             pbar.set_description(f'Poisoned Data Saved: {data_key}')
 
+        if args.device_type == 'xla': xm.mark_step()
+
     if purify_pbar is False and rank == 0:
         pbar.close()
 
@@ -177,12 +182,13 @@ if __name__ == '__main__':
 
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
-    args_diff.add_argument('--diff_model', default=None, type=none_or_str, choices=[None,'HF_DDPM','UNET_SMALL', 'DDPM_UNET','DDPM_UNET_EBM'],help='type of diffusion model to use')
-    args_diff.add_argument('--diff_name', default='google/ddpm-cifar10-32', type=str_or_str_list, help='path to the diffusion model')
+    args_diff.add_argument('--diff_model', default='DM_UNET', type=none_or_str, choices=[None,'DM_DDPM_PRE','DM_UNET_SMALL', 'DM_UNET'],help='type of diffusion model to use')
+    args_diff.add_argument('--diff_name', default='cinic10_imagenet_DDPM[150]_nf[(32, 32, 64, 64, 128, 128)]', type=str, help='path to the diffusion model')
+    args_diff.add_argument('--unet_channels', default=(32, 32, 64, 64, 128, 128), type=int_or_int_list, help='number of channels for the unet model')
     args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
     args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')
     args_diff.add_argument('--num_res_blocks', default=2, type=int, help='number of res blocks in the unet')
-    args_diff.add_argument('--diff_T', default=10, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
+    args_diff.add_argument('--diff_T', default=50, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
 
     ### Poison Arguments ###
     parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench','NeuralTangent'],help='type of poison to generate')

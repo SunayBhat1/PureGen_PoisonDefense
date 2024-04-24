@@ -151,7 +151,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
     # NTG Attack Data
     if args.poison_type == 'NeuralTangent':
-        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense','NeuralTangent',args.data_key + '.pt'))
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG',args.data_key + '.pt'))
         base_data = Simple_Dataset_Base(base_data, transforms=transforms.Compose([transforms.ToTensor()]))
         target_mask_label = None
 
