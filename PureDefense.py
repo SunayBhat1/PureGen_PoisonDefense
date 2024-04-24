@@ -238,7 +238,6 @@ class PureDefense:
 
         if diff_type == 'HF_DDPM_PRE':
             self.DM = UNet2DModel.from_pretrained('google/ddpm-cifar10-32')
-            self.DM = self.DM.to(self.device)
 
             self.scheduler = DDPMScheduler.from_pretrained('google/ddpm-cifar10-32')
         else:
@@ -254,9 +253,9 @@ class PureDefense:
             # Scheduler for DDPM
             self.scheduler = DDPMScheduler(num_train_timesteps=1000)
 
-            # Move the Diffusion model to the device
-            self.DM = self.DM.to(self.device)
-            self.DM.eval()
+        # Move the Diffusion model to the device
+        self.DM = self.DM.to(self.device)
+        self.DM.eval()
 
         if verbose:
             num_params = sum(p.numel() for p in self.DM.parameters() if p.requires_grad)    
