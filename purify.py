@@ -124,7 +124,7 @@ def main(rank, args):
         elif args.poison_type == 'NeuralTangent':
             if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense','NTG')):
                 os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense','NTG'))
-            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense','NTG',f'{data_key}.pt'))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG',f'{data_key}.pt'))
         else:
             save_dir = save_poisons(args,purified_data, poison_indices, target_mask_label, data_key)
 
