@@ -236,12 +236,12 @@ class PureDefense:
         None. The method directly modifies the `self.Diff` attribute of the class instance.
         """
 
-        if diff_type == 'DM_DDPM_PRE':
+        if diff_type == 'HF_DDPM_PRE':
             self.DM = UNet2DModel.from_pretrained('google/ddpm-cifar10-32')
             self.DM = self.DM.to(self.device)
 
             self.scheduler = DDPMScheduler.from_pretrained('google/ddpm-cifar10-32')
-        elif diff_type == 'HF_NCSNPP':
+        elif diff_type == 'HF_NCSNPP_PRE':
             self.DM = UNet2DModel.from_pretrained("google/ncsnpp-ffhq-1024")
             self.DM = self.DM.to(self.device)
 

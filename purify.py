@@ -182,7 +182,7 @@ if __name__ == '__main__':
 
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
-    args_diff.add_argument('--diff_model', default='DM_UNET', type=none_or_str, choices=[None,'DM_DDPM_PRE','DM_UNET_SMALL', 'DM_UNET'],help='type of diffusion model to use')
+    args_diff.add_argument('--diff_model', default='DM_UNET', type=none_or_str, choices=[None,'DM_UNET','HF_NCSNPP_PRE','HF_DDPM_PRE','DM_UNET_SMALL'],help='type of diffusion model to use')
     args_diff.add_argument('--diff_name', default='cinic10_imagenet_DDPM[150]_nf[(32, 32, 64, 64, 128, 128)]', type=str, help='path to the diffusion model')
     args_diff.add_argument('--unet_channels', default=(32, 32, 64, 64, 128, 128), type=int_or_int_list, help='number of channels for the unet model')
     args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
