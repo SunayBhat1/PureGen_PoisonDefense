@@ -3,6 +3,7 @@ import torchvision.transforms as transforms
 import io
 from PIL import Image
 from tqdm import tqdm
+import time
 
 try: import torch_xla.core.xla_model as xm
 except: pass
@@ -45,8 +46,7 @@ class PureDefense:
 
     def purify(self, data_loader, 
                ebm_lang_steps=100,ebm_lang_temp=1e-4,
-               diff_steps=[0,50,5], ebm_guided=False, 
-               sample_freq=10, additonal_guided_steps=None,
+               diff_steps=125,
                purify_reps=1,
                pbar=True):
         """
@@ -130,7 +130,7 @@ class PureDefense:
             if self.device_type =='xla': xm.mark_step()
         if self.device_type =='xla': xm.mark_step()
 
-        return X_purify
+        return X_purify.detach()
 
     def diff_purify(self, X_input,diff_steps,reverse_only=False):
         """
@@ -143,23 +143,22 @@ class PureDefense:
         torch.Tensor: The purified tensor.
         """
 
-        if reverse_only:
-            forward_images = X_input
-        else:
-            forward_images = self.scheduler.add_noise(X_input,torch.randn(X_input.shape),timesteps = torch.LongTensor([diff_steps])).to(self.device)
+        with torch.no_grad():
 
-        reverse_images = forward_images.clone()
+            if reverse_only:
+                forward_images = X_input
+            else:
+                forward_images = self.scheduler.add_noise(X_input,torch.randn(X_input.shape),timesteps = torch.LongTensor([diff_steps])).to(self.device)
 
-        for i, t in enumerate(self.scheduler.timesteps[-diff_steps:]):
-            # 1. predict noise residual
-            with torch.no_grad():
-                residual = self.DM(reverse_images, t).sample
+            reverse_images = forward_images.clone()
 
-            # 2. compute previous image and set x_t -> x_t-1
-            reverse_images = self.scheduler.step(residual, t, reverse_images).prev_sample
+            for i, t in enumerate(self.scheduler.timesteps[-diff_steps:]):
+                residual = self.DM(reverse_images, timestep=t,return_dict=False)[0]
+                reverse_images = self.scheduler.step(residual, t, reverse_images).prev_sample
 
-            xm.mark_step()
-        
+                if self.device_type =='xla': xm.mark_step()
+            if self.device_type =='xla': xm.mark_step()
+
         return reverse_images
 
     def jpeg_compress_batch(self, batch):
