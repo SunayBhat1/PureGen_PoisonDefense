@@ -55,11 +55,16 @@ def main(rank, args):
     if args.diff_model is None: diff_path = None
     else: diff_path = os.path.join(args.data_dir,'PureGen_Models',args.diff_model,args.diff_name+'.pt')
 
+    # Get the unet channels
+    if args.unet_channels == 'S': unet_channels = [32, 32, 64, 64, 128, 128]
+    elif args.unet_channels == 'M': unet_channels = [64, 64, 128, 128, 256, 256]
+    elif args.unet_channels == 'L': unet_channels = [128, 128, 256, 256, 512, 512]
+
     # Create the PureDefense object
     PurifyClass = PureDefense(device,args.device_type,
                             ebm_type=args.ebm_model,ebm_path=ebm_path,ebm_nf=args.ebm_nf,                   # EBM Model
                             diff_type=args.diff_model,diff_path=diff_path,                                  # Diffusion Model
-                            diff_unet_channels=args.unet_channels,diff_nf=args.diff_nf,                     # Diffusion Model
+                            diff_unet_channels=unet_channels,diff_nf=args.diff_nf,                     # Diffusion Model
                             jpeg_compression=args.jpeg_compression,                                         # JPEG Compression
                             verbose=args.verbose)
     
@@ -184,7 +189,7 @@ if __name__ == '__main__':
     args_diff = parser.add_argument_group('Diffusion')
     args_diff.add_argument('--diff_model', default='DM_UNET', type=none_or_str, choices=[None,'DM_UNET','HF_NCSNPP_PRE','HF_DDPM_PRE','DM_UNET_SMALL'],help='type of diffusion model to use')
     args_diff.add_argument('--diff_name', default='cinic10_imagenet_DDPM[150]_nf[(32, 32, 64, 64, 128, 128)]', type=str, help='path to the diffusion model')
-    args_diff.add_argument('--unet_channels', default=(32, 32, 64, 64, 128, 128), type=int_or_int_list, help='number of channels for the unet model')
+    args_diff.add_argument('--unet_channels', default='M', type=str, help='number of channels for the unet model',choices=['S','M','L'])
     args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
     args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')
     args_diff.add_argument('--num_res_blocks', default=2, type=int, help='number of res blocks in the unet')
