@@ -112,7 +112,10 @@ def main(rank, args):
         if args.ebm_model is not None:
             data_key += f'{args.ebm_model}[{args.ebm_name}]_Steps[{args.ebm_lang_steps}]_T[{args.ebm_lang_temp}]'
         if args.diff_model is not None:
-            data_key += f'_{args.diff_model}[{args.diff_name.replace("/","_")}]_T[{args.diff_T}]'
+            if args.diff_model == 'HF_DDPM_PRE':
+                data_key += f'HF_DDPM[google/ddpm-cifar10-32]_T[{args.diff_T}]'
+            else:
+                data_key += f'_{args.diff_model}[{args.diff_name.replace("/","_")}]_T[{args.diff_T}]'
         if args.jpeg_compression is not None:
             data_key += f'_JPEG[{args.jpeg_compression}]'
         if args.purify_reps > 1: 
