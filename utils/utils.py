@@ -227,7 +227,7 @@ def update_progress_bar(args, pbar, epoch, logs):
 # Save Functions #
 ##################
         
-def get_accs_save_results_clean(args, rank, target_index, end_acc, training_time, logs):
+def get_accs_save_results(args, rank, target_index, end_acc, training_time, logs):
 
     if args.device_type == 'xla':
         df_path = os.path.join(args.output_dir,f'Results_{rank}.csv')
@@ -248,12 +248,13 @@ def get_accs_save_results_clean(args, rank, target_index, end_acc, training_time
 
     # Append results to the dataframe
     df = pd.concat([df, pd.DataFrame({'Model': args.model, 'Dataset': args.dataset,
-                                            'Target Index': target_index,
-                                            'End Acc': end_acc,
-                                            'Exp Name': args.exp_name,
-                                            'Calc Time': args.experiment_timestamp,
+                                        'Data Key': args.data_key,
+                                        'Target Index': target_index,
+                                        'End Acc': end_acc,
+                                        'Exp Name': args.exp_name,
+                                        'Calc Time': args.experiment_timestamp,
                                             'Args': args_str, 'Logs': logs_str, 'Train Time': training_time
-                                            }, index=[0])], ignore_index=True)
+                                    }, index=[0])], ignore_index=True)
     # Save the dataframe
     df.to_csv(df_path, index=False)
 

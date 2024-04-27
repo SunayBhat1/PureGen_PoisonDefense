@@ -216,7 +216,7 @@ def main(rank, args):
     ##############################
                 
     if args.poison_type == 'NeuralTangent':
-        get_accs_save_results_clean(args, rank, target_index, end_acc, training_time, logs)
+        get_accs_save_results(args, rank, target_index, end_acc, training_time, logs)
     else:
         if args.poison_type != 'Narcissus':
             get_accs_save_results(args, rank, target_index, end_acc, success, correct_class, training_time, logs)
