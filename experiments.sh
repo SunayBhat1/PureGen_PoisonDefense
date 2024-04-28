@@ -4,22 +4,10 @@
 
 ### Node 3: NTG Attack
 (
-# Large 1000 Steps Model 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[L]_ep[200]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
-# Medium 1000 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
-# Large 750 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
-# Medium 750 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
-# Large 500 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
 # Medium 500 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
-# Large 250 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_ep[150]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
-# Medium 250 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
+# Large 150 Steps Model
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[150]_nf[L]_ep[100]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
 )
 
 ### Node4: Narc Eps 8
@@ -28,18 +16,9 @@ python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar1
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[L]_ep[200]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
 # Medium 1000 Steps Model
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
-# Large 750 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
-# Medium 750 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
-# Large 500 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
 # Medium 500 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
-# Large 250 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_ep[150]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
-# Medium 250 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus';
 )
 
 ### Node 5 Narc Eps 16
@@ -60,8 +39,8 @@ python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar1
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 # Medium 500 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 # Large 250 Steps Model
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_ep[150]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_ep[150]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
@@ -75,11 +54,17 @@ python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar1
 ####################
 
 
-### Node 1:
+### Node 3:
 for i in 200 150 125 100 75 50 25 10
 do
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[150]_nf[(64, 64, 128, 128, 256, 256)]]_T[$i]" --poison_type 'Narcissus';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cinic10_imagenet_DDPM[150]_nf[(32, 32, 64, 64, 128, 128)]]_T[$i]" --poison_type 'Narcissus';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[1000]_nf[L]_ep[200]]_T[$i]" --poison_type 'NeuralTangent';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[1000]_nf[M]_ep[150]]_T[$i]" --poison_type 'NeuralTangent';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[750]_nf[L]_ep[175]]_T[$i]" --poison_type 'NeuralTangent';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[750]_nf[M]_ep[150]]_T[$i]" --poison_type 'NeuralTangent';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[500]_nf[L]_ep[175]]_T[$i]" --poison_type 'NeuralTangent';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[500]_nf[M]_ep[150]]_T[$i]" --poison_type 'NeuralTangent';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]_ep[150]]_T[$i]" --poison_type 'NeuralTangent';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[M]_ep[150]]_T[$i]" --poison_type 'NeuralTangent';
 done
 
 ### Node 3:
@@ -110,6 +95,11 @@ rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_M
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node3:/home/sunaybhat/data/PureGen_Models/;
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node4:/home/sunaybhat/data/PureGen_Models/;
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node5:/home/sunaybhat/data/PureGen_Models/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node6:/home/sunaybhat/data/PureGen_Models/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node7:/home/sunaybhat/data/PureGen_Models/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node8:/home/sunaybhat/data/PureGen_Models/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node9:/home/sunaybhat/data/PureGen_Models/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node10:/home/sunaybhat/data/PureGen_Models/;
 
 
 # Copy Poisons Up to Node

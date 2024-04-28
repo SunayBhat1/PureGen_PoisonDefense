@@ -258,7 +258,7 @@ def get_accs_save_results(args, rank, target_index, end_acc, training_time, logs
     # Save the dataframe
     df.to_csv(df_path, index=False)
 
-def get_accs_save_results(args, rank, target_index, end_acc, success, correct_class, training_time, logs):
+def get_accs_save_results_untriggered(args, rank, target_index, end_acc, success, correct_class, training_time, logs):
 
     if args.device_type == 'xla':
         df_path = os.path.join(args.output_dir,f'Results_{rank}.csv')
@@ -290,7 +290,7 @@ def get_accs_save_results(args, rank, target_index, end_acc, success, correct_cl
     # Save the dataframe
     df.to_csv(df_path, index=False)
     
-def get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_time, logs, p_accs, t_accs):
+def get_accs_save_results_triggered(args, rank, target_index, end_acc, training_time, logs, p_accs, t_accs):
 
     if args.device_type == 'xla':
         df_path = os.path.join(args.output_dir,f'Results_{rank}.csv')

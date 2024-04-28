@@ -219,9 +219,9 @@ def main(rank, args):
         get_accs_save_results(args, rank, target_index, end_acc, training_time, logs)
     else:
         if args.poison_type != 'Narcissus':
-            get_accs_save_results(args, rank, target_index, end_acc, success, correct_class, training_time, logs)
+            get_accs_save_results_untriggered(args, rank, target_index, end_acc, success, correct_class, training_time, logs)
         else:
-            get_accs_save_results_Narcissus(args, rank, target_index, end_acc, training_time, logs, p_accs, t_accs)
+            get_accs_save_results_triggered(args, rank, target_index, end_acc, training_time, logs, p_accs, t_accs)
 
     # Save the model
     if args.save_models:
