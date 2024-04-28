@@ -234,7 +234,7 @@ def get_accs_save_results(args, rank, target_index, end_acc, training_time, logs
     else:
         df_path = os.path.join(args.output_dir,'Results.csv')
 
-    df = pd.DataFrame(columns=['Model','Dataset','Target Index','End Acc','Exp Name','Calc Time','Args','Logs','Train Time'])
+    df = pd.DataFrame(columns=['Model','Dataset','Data Key','Target Index','End Acc','Exp Name','Calc Time','Args','Logs','Train Time'])
 
     # Convert args to a dictionary and then a json string
     args_dict = vars(args)
