@@ -2,53 +2,50 @@
 # Nodes Lists #
 ###############
 
-### Node 3: NTG Attack
+# --diff_T 150,125,100,75# 
+
+### Node1: OOD Purify
 (
-# Medium 500 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --poison_type 'NeuralTangent' --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'flowers102_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'flowers102_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'lfw_people_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'lfw_people_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'office_home_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'office_home_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'textures_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'textures_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'flowers102_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'flowers102_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'lfw_people_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'lfw_people_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
+
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
 )
 
-### Node 1,4,5 Narc Eps 16
+
+
+
+### Node 3:
+
+### Node 5
 (
-# Large 1000 Steps Model 
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[L]_ep[200]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[L]_ep[200]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Medium 1000 Steps Model
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[1000]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Large 750 Steps Model
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Medium 750 Steps Model
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[750]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Large 500 Steps Model
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[L]_ep[175]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-## Large 250 Steps Model
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_ep[150]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_ep[150]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Medium 250 Steps Model
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-
-)
-
-## Node4:
-(
-# Large 150 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[150]_nf[L]_ep[100]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[150]_nf[L]_ep[100]' --unet_channels L --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Medium 500 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[500]_nf[M]_ep[125]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-)
-
-### Node1:
-(
-# Medium 150 Steps Model
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[150]_nf[M]_ep[75]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[150]_nf[M]_ep[75]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 )
 
 ####################
@@ -56,17 +53,26 @@ python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar1
 ####################
 
 
-### Node 3:
-for i in 200 150 125 100 75 50 25 10
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[500]_nf[M]_ep[125]]_T[$i]" --poison_type 'NeuralTangent';
-done
-
 ### Node 5 Narc Eps 16
 for i in 200 150 125 100 75 50 25 10
 do 
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[150]_nf[(64, 64, 128, 128, 256, 256)]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cinic10_imagenet_DDPM[150]_nf[(32, 32, 64, 64, 128, 128)]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[1000]_nf[L]_ep[200]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[1000]_nf[M]_ep[150]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[750]_nf[L]_ep[175]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[750]_nf[M]_ep[150]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[500]_nf[L]_ep[175]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[500]_nf[M]_ep[125]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]_ep[150]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[M]_ep[150]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
 done
+
+### Node 4:
+for i in 200 150 125 100 75 50 25 10
+do
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[150]_nf[L]_ep[100]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[500]_nf[M]_ep[125]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+done
+
 
  
 ###############
