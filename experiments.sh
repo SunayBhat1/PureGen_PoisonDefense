@@ -6,13 +6,6 @@
 
 ### Node1: OOD Purify Narc Eps 8
 ( # Running
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'flowers102_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'lfw_people_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'office_home_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'textures_nf[32]' --ebm_lang_steps 250,200,150,100  --num_proc 8 --poison_type 'Narcissus';
-
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'flowers102_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
 
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'lfw_people_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
@@ -21,13 +14,17 @@ python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'lfw_pe
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
 
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75  --num_proc 8 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 125;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75,74,73,72,71  --num_proc 8 --poison_type 'Narcissus';
 )
 
 ### Node 3: OOD Neural Tangent
 (
-# Need rerun
+# To Run
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'lfw_people_nf[32]' --ebm_lang_steps 1000 750 500 150 --num_proc 8 --poison_type 'NeuralTangent';
+
+# Running
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125 --num_proc 8 --poison_type 'NeuralTangent';
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125 --num_proc 8 --poison_type 'NeuralTangent';
 )
@@ -55,8 +52,7 @@ done
 
 ### Node 5: Narc Eps 16 ID DDPM
 (
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[M]_ep[150]' --unet_channels M --diff_T 200,150,125,100,75,50,25,10  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_ep[150]' --diff_T 200,150,125,100,75,50  --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 )
 
 ### Node 5 
