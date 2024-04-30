@@ -140,7 +140,8 @@ def main(rank, args):
             save_dir = save_poisons(args,purified_data, poison_indices, target_mask_label, data_key)
 
         # Save the purify time
-        save_purify_time(data_key,purify_time,args,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset))
+        try: save_purify_time(data_key,purify_time,args,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset))
+        except: pass
 
         if purify_pbar is False and rank == 0:
             # Update and set description
