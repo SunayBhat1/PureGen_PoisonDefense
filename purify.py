@@ -184,7 +184,7 @@ if __name__ == '__main__':
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
     args_ebm.add_argument('--ebm_model', default='EBM', type=none_or_str, choices=[None,'SuperLightEBM','LightEBM','EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
-    args_ebm.add_argument('--ebm_name', default='cinic10_imagenet_ep120_nf32', type=str_or_str_list, help='path to the EBM model including train dataset')
+    args_ebm.add_argument('--ebm_name', default='cinic10_imagenet_nf[32]', type=str_or_str_list, help='path to the EBM model including train dataset')
     args_ebm.add_argument('--ebm_nf', default=32, type=int_or_int_list,  help='number of filters for the ebm model')
     args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')
     args_ebm.add_argument('--ebm_lang_temp', default=1e-4, type=float_or_float_list, help='langevin temperature')
@@ -192,7 +192,7 @@ if __name__ == '__main__':
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
     args_diff.add_argument('--diff_model', default='DM_UNET', type=none_or_str, choices=[None,'DM_UNET','HF_NCSNPP_PRE','HF_DDPM_PRE','DM_UNET_SMALL'],help='type of diffusion model to use')
-    args_diff.add_argument('--diff_name', default='cinic10_imagenet_DDPM[150]_nf[(32, 32, 64, 64, 128, 128)]', type=str, help='path to the diffusion model')
+    args_diff.add_argument('--diff_name', default='cincic10_imagenet_DDPM[250]_nf[L]', type=str_or_str_list, help='path to the diffusion model')
     args_diff.add_argument('--unet_channels', default='L', type=str, help='number of channels for the unet model',choices=['S','M','L'])
     args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
     args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')
