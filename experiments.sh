@@ -2,6 +2,8 @@
 # Nodes Lists #
 ###############
 
+for i in 150 125 100 75; do     python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent'; done
+
 # POOD Narcissus
 
 ### Node1: 
@@ -41,53 +43,49 @@ done
 
 
 ### Node4:DM Cifar/Cinic-10
+(
 python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 \
     --diff_name 'cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]' \
     --diff_T 150,125,100,75,150,125,100,75;
 python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 --poison_type 'Narcissus' \
     --diff_name 'cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]' \
     --diff_T 150,125,100,75,150,125,100,75;
+python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+    --diff_name 'cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cifar10_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]','cinic10_imagenet_DDPM[250]_nf[L]' \
+    --diff_T 150,125,100,75,150,125,100,75;
+)
 
+### Node 7:DM Office-Home/Flowers-102
+(
+python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 \
+    --diff_name 'office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]' \
+    --diff_T 150,125,100,75,150,125,100,75;
+python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 --poison_type 'Narcissus' \
+    --diff_name 'office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]' \
+    --diff_T 150,125,100,75,150,125,100,75;
+python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+    --diff_name 'office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','office_home_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]','flowers102_DDPM[250]_nf[L]' \
+    --diff_T 150,125,100,75,150,125,100,75;
+)
+
+### Node 8:DM LFW/Textures
+(
+python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 \
+    --diff_name 'lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]' \
+    --diff_T 150,125,100,75,150,125,100,75;
+python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 --poison_type 'Narcissus' \
+    --diff_name 'lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]' \
+    --diff_T 150,125,100,75,150,125,100,75;
+python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+    --diff_name 'lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','lfw_people_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]','textures_DDPM[250]_nf[L]' \
+    --diff_T 150,125,100,75,150,125,100,75;
+)
 
 ### Node 5
 for i in 200 150 125 100 75 50
 do
     python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]_ep[150]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
 done
-
-
-### EBMs ###
-
-### Diffusion Models ###
-(
-# Node 4
-# Cifar-10
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Cinic-10
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'cinic10_imagenet_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'cinic10_imagenet_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'cinic10_imagenet_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Office-Home
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'office_home_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Flowers-102
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'flowers102_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'flowers102_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'flowers102_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# LFW-People
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'lfw_people_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'lfw_people_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'lfw_people_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# Textures
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat'  --ebm_model None --diff_name 'textures_DDPM[250]_nf[L]' --diff_T 150,125,100,75 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-)
-
-### Node 3: OOD Neural Tangent
 
 ############################
 # Setup Node and Copy Data #
@@ -103,7 +101,7 @@ rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_M
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node8:/home/sunaybhat/data/PureGen_Models/;
 
 # Copy Poisons Up to Node
-rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/Poisons/* sunaybhat@node1:/home/sunaybhat/data/Poisons/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/Poisons/* sunaybhat@node8:/home/sunaybhat/data/Poisons/;
 
 # Copy Cifar10 Split Data Up to Node
 scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Splith sunaybhat@Calt3_dani:/home/sunaybhat/data/;
@@ -126,8 +124,3 @@ pip install .;
 cd ..;
 rm -rf submodlib;
 )
-
-(
-
-)
-
