@@ -4,17 +4,70 @@
 
 ### Node 1Purify Poisoned EBM
 (
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_nf[32]_NS[num=5000_size=32_eps=8]' --num_proc 8 --ebm_lang_steps 2000,1000,750,150;
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_nf[32]_NS[num=5000_size=32_eps=8]' --ebm_lang_steps 150 --poison_type 'Narcissus';
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_nf[32]_NS[num=5000_size=32_eps=8]' --num_proc 8 --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-)
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750,150;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --ebm_lang_steps 150 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750,150;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --ebm_lang_steps 150 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750,150 --ebm_name 'EBMSNGAN32' --ebm_nf 128;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --ebm_lang_steps 150 --poison_type 'Narcissus' --ebm_name 'EBMSNGAN32' --ebm_nf 128;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16 --ebm_name 'EBMSNGAN32' --ebm_nf 128;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750,150 --ebm_name 'EBMSNGAN32' --ebm_nf 128;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --ebm_lang_steps 150 --poison_type 'Narcissus' --ebm_name 'EBMSNGAN32' --ebm_nf 128;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16 --ebm_name 'EBMSNGAN32' --ebm_nf 128;
+
 
 # Train classifer
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cifar10_nf[32]_NS[num=5000_size=32_eps=8]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cifar10_nf[32]_NS[num=5000_size=32_eps=8]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cifar10_NS[num=5000_size=32_eps=8]_nf[32]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cifar10_NS[num=5000_size=32_eps=16]_nf[32]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=8]_nf[128]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=16]_nf[128]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus';
 
+for i in 2000 1000 750; do
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cifar10_NS[num=5000_size=32_eps=8]_nf[32]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cifar10_NS[num=5000_size=32_eps=16]_nf[32]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=8]_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=16]_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+done
+)
 
-
+### Node3: NTG Posion Purify and Train
+(
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 --ebm_nf 64 \
+    --ebm_name 'cifar10_nf[64]','cifar10_nf[64]','cifar10_nf[64]','cifar10_nf[64]','fgvc_aircraft_nf[64]','fgvc_aircraft_nf[64]','fgvc_aircraft_nf[64]','fgvc_aircraft_nf[64]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 \
+    --ebm_name 'flowers102_nf[32]','flowers102_nf[32]','flowers102_nf[32]','flowers102_nf[32]','cinic10_imagenet_nf[64]','cinic10_imagenet_nf[64]','cinic10_imagenet_nf[64]','cinic10_imagenet_nf[64]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 \
+    --ebm_name 'food101_nf[32]','food101_nf[32]','food101_nf[32]','food101_nf[32]','lfw_people_nf[32]','lfw_people_nf[32]','lfw_people_nf[32]','lfw_people_nf[32]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 \
+    --ebm_name 'office_home_nf[32]','office_home_nf[32]','office_home_nf[32]','office_home_nf[32]','oxford_iiit_pet_nf[32]','oxford_iiit_pet_nf[32]','oxford_iiit_pet_nf[32]','oxford_iiit_pet_nf[32]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 \
+    --ebm_name 'textures_nf[32]' \
+    --ebm_lang_steps 850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8  --ebm_name 'EBMSNGAN32' --ebm_nf 128 \
+    --ebm_name 'cifar10_nf[128]','cifar10_nf[128]','cifar10_nf[128]','cifar10_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 --ebm_name 'EBMSNGAN32' --ebm_nf 128 \
+    --ebm_name 'flowers102_nf[128]','flowers102_nf[128]','flowers102_nf[128]','flowers102_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 --ebm_name 'EBMSNGAN32' --ebm_nf 128 \
+    --ebm_name 'food101_nf[128]','food101_nf[128]','food101_nf[128]','food101_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 --ebm_name 'EBMSNGAN32' --ebm_nf 128 \
+    --ebm_name 'office_home_nf[128]','office_home_nf[128]','office_home_nf[128]','office_home_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]' \
+    --ebm_lang_steps 850,800,750,700,850,800,750,700;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --poison_type 'NeuralTangent' --num_proc 8 --ebm_name 'EBMSNGAN32' --ebm_nf 128 \
+    --ebm_name 'textures_nf[128]' \
+    --ebm_lang_steps 850,800,750,700;
+)
 
 
 ### Node4: Purify DM

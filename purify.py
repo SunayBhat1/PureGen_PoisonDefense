@@ -175,7 +175,7 @@ if __name__ == '__main__':
     
     ### Experiment Arguments ###
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
-    parser.add_argument('--jpeg_compression', default=None, type=int, help='jpeg compression quality (No compression if None)')
+    parser.add_argument('--jpeg_compression', default=None, type=int_or_int_list, help='jpeg compression quality (No compression if None)')
 
     ### Purification Arguments ###
 
