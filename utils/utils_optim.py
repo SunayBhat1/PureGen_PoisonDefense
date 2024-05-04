@@ -1,7 +1,9 @@
 import torch
 from torch import Tensor
-from torch.optim.optimizer import (Optimizer, required, _use_grad_for_differentiable, _default_to_fused_or_foreach,
-                        _differentiable_doc, _foreach_doc, _maximize_doc)
+try:
+    from torch.optim.optimizer import (Optimizer, required, _use_grad_for_differentiable, _default_to_fused_or_foreach,
+                            _differentiable_doc, _foreach_doc, _maximize_doc)
+except: from torch.optim.optimizer import (Optimizer,required)
 from typing import List, Optional
 from torch.utils._foreach_utils import _group_tensors_by_device_and_dtype
 

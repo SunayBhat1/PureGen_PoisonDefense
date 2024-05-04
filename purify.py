@@ -30,7 +30,7 @@ def main(rank, args):
         return
 
     # Get the data loader and number of target indices
-    if args.poison_type in [None,'NeuralTangent']:
+    if args.poison_type in [None,'NeuralTangent','TransferBase']:
         target_indices = 1
         purify_pbar = True
     else:
@@ -90,6 +90,9 @@ def main(rank, args):
         elif args.poison_type == 'NeuralTangent':
             train_data = get_ntg(os.path.join(args.data_dir,'Poisons/NTG'),True, transform=torchvision.transforms.ToTensor())
             train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+        elif args.poison_type == 'TransferBase':
+            train_data = ImageListDataset(torch.load(os.path.join('/home/sunaybhat/data','CIFAR10_TRAIN_Split.pth'))['others'])
+            train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)
             train_loader = torch.utils.data.DataLoader(ImageListDataset(poison_tuple_list), batch_size=128, shuffle=False, num_workers=4)
@@ -136,6 +139,10 @@ def main(rank, args):
             if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG')):
                 os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG'))
             torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG',f'{data_key}.pt'))
+        elif args.poison_type == 'TransferBase':
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase')):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase'))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase',f'{data_key}.pt'))
         else:
             save_dir = save_poisons(args,purified_data, poison_indices, target_mask_label, data_key)
 
@@ -200,8 +207,8 @@ if __name__ == '__main__':
     args_diff.add_argument('--diff_T', default=50, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
 
     ### Poison Arguments ###
-    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus', 'GradientMatching','BullseyePolytope','BullseyePolytope_Bench','NeuralTangent'],help='type of poison to generate')
-    parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','transfer'],help='mode of attack')
+    parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus','GradientMatching','TransferBase','BullseyePolytope','BullseyePolytope_Bench','NeuralTangent'],help='type of poison to generate')
+    parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','linear_transfer','fine_tune_transfer'],help='mode of attack')
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
     parser.add_argument('--num_images_narcissus', default=500, type=int_or_int_list, help='number of poisoned images generated')
@@ -209,7 +216,6 @@ if __name__ == '__main__':
     parser.add_argument('--iters_bp', default=800, type=int,help='iterations for making poison')
     parser.add_argument('--num_images_bp', default=50, type=int,help='number of poisoned images generated')
     parser.add_argument('--net_repeat_bp', default=1, type=int, help='number of times to repeat the network for methods BP-1, BP-3, BP-5')
-    parser.add_argument('--num_per_class_bp', default=50, type=int, help='num of samples per class for re-training, or the poison dataset')
 
     # Parse the arguments
     args = parser.parse_args()

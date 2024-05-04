@@ -47,20 +47,16 @@ def save_poisons(args,poison_tuple_list, poison_indices, target, data_key):
         str: The path to the saved file.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons')
+    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons',args.poison_mode)
     # Create the directory if it doesn't exist
     if args.poison_type == 'GradientMatching':
         save_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
         save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
-        if args.fine_tune: bp_subpath = 'end2end-training'
-        else: bp_subpath = 'linear-transfer-learning'
-        if args.num_images_bp == 5: bp_subpath = os.path.join(bp_subpath, f'mean-{args.net_repeat_bp}Repeat')
-        else: bp_subpath = os.path.join(bp_subpath, f'mean')
-        save_dir = os.path.join(args.data_dir, subfolder, f'Bullseye_Polytope/{args.num_images_bp}-imgs/{bp_subpath}/{args.iters_bp}-iters')
+        save_dir = os.path.join(args.data_dir, subfolder, f'BullseyePolytope/imgs={args.num_images_bp}_iters={args.iters_bp}_repeat={args.net_repeat_bp}')
     elif args.poison_type == 'BullseyePolytope_Bench':
-        save_dir = os.path.join(args.data_dir, subfolder, f'Transfer_Bench/bp_poisons/{args.num_images_bp}-imgs')
+        save_dir = os.path.join(args.data_dir, subfolder, f'BullseyePolytopeBench/imgs={args.num_images_bp}')
 
     if not os.path.exists(os.path.join(save_dir, data_key)):
         os.makedirs(os.path.join(save_dir, data_key))
@@ -112,15 +108,16 @@ def get_poisons(args,target_index):
         inverse_transform = transforms.Compose([transforms.Normalize(mean=[-i/j for i,j in zip(cifar_mean, cifar_std)], std=[1/j for j in cifar_std]),transforms.ToPILImage()])
 
         # Path Adjustments for Bullseye Polytope Settings
-        if args.fine_tune: bp_subpath = 'end2end-training'
-        else: bp_subpath = 'linear-transfer-learning'
+        if args.poison_mode == 'fine_tune_transfer': bp_subpath = 'end2end-training'
+        elif args.poison_mode == 'linear_transfer': bp_subpath = 'linear-transfer-learning'
+        else: raise ValueError(f"Poison mode {args.poison_mode} not supported for Bullseye Polytope attack.")
 
         if args.num_images_bp == 5: bp_subpath = os.path.join(bp_subpath, f'mean-{args.net_repeat_bp}Repeat')
         else: bp_subpath = os.path.join(bp_subpath, f'mean')
 
         # Load the poison
         bp_poison = torch.load(os.path.join(args.data_dir, \
-                        f'Poisons/Bullseye_Polytope/attack-results-{args.num_images_bp}poisons/100-overlap/{bp_subpath}/{args.iters_bp}/{target_index}/poison_{args.iters_bp-1:05d}.pth'),map_location=torch.device('cpu'))
+                        f'Poisons/Bullseye_Polytope/{args.dataset}/attack-results-{args.num_images_bp}poisons/100-overlap/{bp_subpath}/{args.iters_bp}/{target_index}/poison_{args.iters_bp-1:05d}.pth'),map_location=torch.device('cpu'))
         
         poison_tuple_list, poison_indices = bp_poison['poison'], bp_poison['idx']
 
@@ -268,7 +265,7 @@ def process_args(args, rank):
     Function to process the arguments for distributed training
     '''
     # List of argument names to process
-    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_T','ebm_name','diff_name','ebm_nf','diff_nf','num_images_narcissus']
+    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_T','ebm_name','diff_name','ebm_nf','diff_nf','num_images_narcissus','jpeg_compression']
 
     for arg_name in arg_names:
         arg_value = getattr(args, arg_name)

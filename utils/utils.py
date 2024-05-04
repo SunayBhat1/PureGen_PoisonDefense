@@ -128,30 +128,21 @@ def set_target_index_and_check_end(args, rank):
 
 def eval_epoch(args,target_net, logs, test_loader, device, test_trigger_loaders=None, poison_target_image=None, target_mask_label=None, target_index=None):
 
-    # Test the model for from_scratch attacks
-    if args.poison_mode in ['from_scratch','clean']:
-        test_acc = get_test_acc(target_net, test_loader, device)
-        logs['test_acc'].append(test_acc)
+    test_acc = get_test_acc(target_net, test_loader, device)
+    logs['test_acc'].append(test_acc)
         
-        if args.poison_type != 'NeuralTangent':
-            if args.poison_type == 'Narcissus':
-                _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
-                logs['p_acc'].append(p_acc)
-                logs['t_acc'].append(t_acc)
+    if args.poison_type != 'NeuralTangent':
+        if args.poison_type == 'Narcissus':
+            _, p_acc, t_acc = run_test_epoch_narcissus(test_trigger_loaders[1], target_net, nn.CrossEntropyLoss(reduction='none'),target_index, device)
+            logs['p_acc'].append(p_acc)
+            logs['t_acc'].append(t_acc)
 
-            else:
-                img_dim = dataset_dict[args.dataset]['img_dim']
-                target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
-                pred = torch.argmax(target_pred).item()
-                success = bool(pred == target_mask_label)
-                logs['p_acc'].append(success)
-            
-    elif args.poison_type not in ['Narcissus','NeuralTangent']:
-        img_dim = dataset_dict[args.dataset]['img_dim']
-        target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
-        pred = torch.argmax(target_pred).item()
-        success = bool(pred == target_mask_label)
-        logs['p_acc'][-1] = success
+        else:
+            img_dim = dataset_dict[args.dataset]['img_dim']
+            target_pred = target_net(poison_target_image.to(device).view(1,3,img_dim,img_dim))
+            pred = torch.argmax(target_pred).item()
+            success = bool(pred == target_mask_label)
+            logs['p_acc'].append(success)
 
     return logs
 

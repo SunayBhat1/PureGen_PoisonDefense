@@ -240,7 +240,7 @@ def main(rank, args):
         elif args.poison_type == 'Narcissus':
             print(f'Index {target_index} | Poison Type {args.poison_type} | P1 Acc {p_accs[1]:.2%} | T1 Acc {t_accs[1]:.2%} | End Acc {end_acc:.2%} | Training Time {training_time:.1f}')
         
-    # Rendezvous 
+    # Rendezvous pho
     if args.device_type == 'xla': xm.rendezvous('training end!')
     
     # Concat the dataframes
@@ -269,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
     parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
     parser.add_argument('--model', default='HLB_S', type=str, choices=['HLB_S','HLB_M','HLB_L','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
-    parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','clean','linear_transfer','fine_tune'],help='mode of attack')
+    parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','clean','linear_transfer','fine_tune_transfer'],help='mode of attack')
     parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus','NeuralTangent','GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','JPEG','Epic','Friendly'],help='type of defense to use')
     

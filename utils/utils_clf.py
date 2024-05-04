@@ -18,7 +18,10 @@ try: import torch_xla.core.xla_model as xm
 except: pass
 
 from utils.clf_models import load_model
-from utils.utils_optim import AdamWq, SMD
+
+try:
+    from utils.utils_optim import AdamWq, SMD
+except: pass
 
 #############
 # Variables #
@@ -52,7 +55,10 @@ dataset_info = {'from_scratch':{
                     'stl10': {'num_classes': 10, 'num_per_label': 500},
                     'stl10_64': {'num_classes': 10, 'num_per_label': 500},
                     },
-                'transfer':{
+                'linear_transfer':{
+                    'cifar10': {'num_classes': 10, 'num_per_label': 200},
+                    },
+                'fine_tune_transfer':{
                     'cifar10': {'num_classes': 10, 'num_per_label': 200},
                     },
                 }
@@ -63,10 +69,10 @@ poison_num_targets = {  'clean': {'Narcissus': 10},
                                          'GradientMatching': 100,
                                          'NeuralTangent': 8,
                                         },
-                        'fine_tune': {'Narcissus': 10,
+                        'fine_tune_transfer': {'Narcissus': 10,
                                         'BullseyePolytope': 50,
                                         },
-                        'transfer': {'BullseyePolytope': 50,
+                        'linear_transfer': {'BullseyePolytope': 50,
                                         'BullseyePolytope_Bench': 100,
                                         },
                         }
@@ -172,39 +178,24 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
     # Poison Data
     else:
-        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
+        if args.poison_mode == 'from_scratch':
+            base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
+        elif args.poison_mode in ['linear_transfer','fine_tune_transfer']:
+            base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase',args.data_key + '.pt'))
 
         poison_tuple_list, poison_indices, target_mask_label = load_poisons(args,target_index)
 
         num_classes,num_per_label = dataset_info[args.poison_mode][args.dataset]['num_classes'],dataset_info[args.poison_mode][args.dataset]['num_per_label']
 
-        if args.poison_mode == 'from_scratch':
-
+        if args.poison_mode == 'BullseyePolytope_Bench':
+            base_data = PoisonedDataset_Bench(args.data_dir,args.dataset,poison_tuple_list,
+                                                            2500,poison_indices)
+        else:
             base_data = Poisoned_Dataset_Base(base_data,
                                                 poison_tuple_list=poison_tuple_list,
                                                 poison_indices = poison_indices,
                                                 num_per_label=num_per_label, num_classes=num_classes,
                                                 transforms=transforms.Compose([transforms.ToTensor()]),
-                                                )
-        elif args.poison_mode == 'transfer':
-            # if poison_type == 'BullseyePolytope':
-            #     base_data = Poisoned_Dataset_Base(os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), 
-            #                                             dataset=args.dataset,
-            #                                             num_per_label=args.num_per_class_bp,
-            #                                             poison_tuple_list= poison_tuple_list,
-            #                                             poison_indices = poison_indices,
-            #                                             transfer=True,
-            #                                             )
-            # elif poison_type == 'BullseyePolytope_Bench':
-            #     base_data = PoisonedDataset_Bench(args.data_dir,args.dataset,poison_tuple_list,
-            #                                                 2500,poison_indices)
-                
-            if args.poison_type == 'Narcissus':
-                base_data = Poisoned_Dataset_Base(base_data, 
-                                                    poison_tuple_list= poison_tuple_list,
-                                                    poison_indices = poison_indices,
-                                                    num_per_label=args.num_per_class_narcissus,
-                                                    transfer=True,
                                                 )
                 
     base_loader = data.DataLoader(base_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
@@ -738,7 +729,7 @@ def get_train_transforms(args):
                                                 transforms.ToTensor()]
         else:
             raise Exception(f"Dataset {args.dataset} transforms not supported for from_scratch poison mode")
-    elif args.poison_mode == 'transfer' and args.poison_type == 'BullseyePolytope':
+    elif args.poison_mode in ['linear_transfer','fine_tune_transfer'] and args.poison_type == 'BullseyePolytope':
         train_transforms = [transforms.ToTensor()]
 
     if args.add_rand_noise and args.defense != 'Friendly':
@@ -906,7 +897,7 @@ def load_target_network(args,device):
     num_classes = dataset_dict[args.dataset]['num_classes']
     img_dim = dataset_dict[args.dataset]['img_dim']
 
-    if args.poison_mode in ['from_scratch','fine_tune']:
+    if args.poison_mode in ['from_scratch','clean']:
         target_net = load_model(args.model, num_classes=num_classes, img_size=img_dim)
     elif args.poison_type == 'BullseyePolytope':
         target_net = load_model(args.model, eval_bn=True)
@@ -916,7 +907,7 @@ def load_target_network(args,device):
         target_net = load_model(args.model)
 
     # Load state dict for transfer learning
-    if args.poison_mode == 'linear_transfer':
+    if args.poison_mode in ['linear_transfer','fine_tune_transfer']:
             
         # Use benchmark if running BullseyePolytope_Bench
         if args.poison_type == 'BullseyePolytope_Bench':
@@ -924,7 +915,7 @@ def load_target_network(args,device):
         else:
             model_path = args.model_path
 
-        state_dict_path = os.path.join(args.data_dir,'models', 'transfer_models', model_path)
+        state_dict_path = os.path.join(args.data_dir, 'PureGen_Models','transfer_models', model_path)
         state_dict_module = torch.load(state_dict_path,map_location=torch.device('cpu'))['net']
         state_dict = {}
         for k,v in state_dict_module.items():
@@ -1045,18 +1036,14 @@ def load_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons')
+    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons',args.poison_mode)
 
     if args.poison_type == 'GradientMatching':
         load_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
         load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
-        if args.fine_tune: bp_subpath = 'end2end-training'
-        else: bp_subpath = 'linear-transfer-learning'
-        if args.num_images_bp == 5: bp_subpath = os.path.join(bp_subpath, f'mean-{args.net_repeat_bp}Repeat')
-        else: bp_subpath = os.path.join(bp_subpath, f'mean')
-        load_dir = os.path.join(args.data_dir, subfolder, f'Bullseye_Polytope/{args.num_images_bp}-imgs/{bp_subpath}/{args.iters_bp}-iters')
+        load_dir = os.path.join(args.data_dir, subfolder, f'BullseyePolytope/imgs={args.num_images_bp}_iters={args.iters_bp}_repeat={args.net_repeat_bp}')
     elif args.poison_type == 'BullseyePolytope_Bench':
         load_dir = os.path.join(args.data_dir, subfolder, f'Transfer_Bench/bp_poisons/{args.num_images_bp}-imgs')
 
