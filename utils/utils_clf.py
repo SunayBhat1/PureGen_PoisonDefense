@@ -178,7 +178,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
     # Poison Data
     else:
-        if args.poison_mode == 'from_scratch':
+        if args.poison_mode == 'from_scratch' or args.poison_type == 'BullseyePolytope_Bench':
             base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
         elif args.poison_mode in ['linear_transfer','fine_tune_transfer']:
             base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase',args.data_key + '.pt'))
@@ -188,7 +188,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
         num_classes,num_per_class = dataset_info[args.poison_mode][args.dataset]['num_classes'],dataset_info[args.poison_mode][args.dataset]['num_per_label']
 
         if args.poison_mode == 'BullseyePolytope_Bench':
-            base_data = PoisonedDataset_Bench(args.data_dir,args.dataset,poison_tuple_list,
+            base_data = PoisonedDataset_Bench(base_data, args.data_dir,poison_tuple_list,
                                                             2500,poison_indices)
         else:
             if args.poison_mode != 'from_scratch':
@@ -365,14 +365,14 @@ class Simple_Dataset_Base(data.Dataset):
 
 class PoisonedDataset_Bench(data.Dataset):
     def __init__(
-        self, path, poison_instances, size=None, poison_indices=None,
+        self, base_data, path, poison_instances, size=None, poison_indices=None,
     ):
         """poison instances should be a list of tuples of poison examples
         and their respective labels like
             [(x_0, y_0), (x_1, y_1) ...]
         """
         super(PoisonedDataset_Bench, self).__init__()
-        self.trainset = torchvision.datasets.CIFAR10(root=path, train=True, download=(not os.path.exists(os.path.join(path, 'cifar-10-batches-py'))))
+        self.trainset = base_data
         self.poison_instances = poison_instances
         self.poison_indices = np.array([]) if poison_indices is None else poison_indices
         self.dataset_size = size if size is not None else len(self.trainset)
@@ -934,7 +934,7 @@ def load_target_network(args,device):
         target_net = target_net.to(device)
 
     # Reinit Linear layer for transfer learning
-    if args.poison_mode == 'linear_transfer' and args.reinit_linear:
+    if args.poison_mode in ['linear_transfer','fine_tune_transfer'] and args.reinit_linear:
         if args.model == 'ResNet18':
             target_net.linear = nn.Linear(512, 10).to(device)
         elif args.model == 'DenseNet121':
@@ -1048,7 +1048,7 @@ def load_poisons(args,target_index):
     elif args.poison_type == 'BullseyePolytope':
         load_dir = os.path.join(args.data_dir, subfolder, f'BullseyePolytope/imgs={args.num_images_bp}_iters={args.iters_bp}_repeat={args.net_repeat_bp}')
     elif args.poison_type == 'BullseyePolytope_Bench':
-        load_dir = os.path.join(args.data_dir, subfolder, f'Transfer_Bench/bp_poisons/{args.num_images_bp}-imgs')
+        load_dir = os.path.join(args.data_dir, subfolder, f'BullseyePolytopeBench/imgs={args.num_images_bp}')
 
     # Load the poison_tuple_list, poison_indices, and target
     poison_tuple_list, poison_indices, target = torch.load(os.path.join(load_dir, args.data_key, f'{target_index}.pth'))

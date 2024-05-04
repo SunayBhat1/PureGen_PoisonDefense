@@ -4,21 +4,13 @@
 
 ###: Bullsyse Polytope
 
-# Purify Transfer Base
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --poison_type 'TransferBase' --num_proc 8 \
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --poison_type 'BullseyePolytope_Bench' --poison_mode 'linear_transfer' --num_images_bp 25 --num_proc 8 \
     --ebm_lang_steps 1000,750,600,500,300,150,500 \
     --ebm_lang_temp 1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,7.5e-5;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 500 --ebm_lang_temp 7.5e-5;
 
-# Purify Narc Fine-Tune
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --ebm_lang_steps 1000 --num_images_narcissus 50;
-
-# Train Classifier Narc Fine-Tune
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cinic10_imagenet_nf[32]]_Steps[1000]_T[0.0001]" --config_overrides 'FINE_TUNE' --poison_type 'Narcissus';
-
-
-# Train Classifier Fine-Tune Transfer
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cinic10_imagenet_nf[32]]_Steps[500]_T[7.5e-05]" --config_overrides 'LINEAR_TRANSFER' --poison_type 'BullseyePolytope' --v;
-
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cinic10_imagenet_nf[32]]_Steps[500]_T[7.5e-05]" --config_overrides 'LINEAR_TRANSFER' 'LT_BBENCH' --poison_type 'BullseyePolytope_Bench';
 
 ### Node 1 Purify Poisoned EBM
 (
