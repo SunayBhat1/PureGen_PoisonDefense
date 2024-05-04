@@ -9,7 +9,7 @@ python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic1
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None --poison_type 'BullseyePolytope' --poison_mode 'linear_transfer';
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None --poison_type 'TransferBase';
 
-python3 train_classifier.py --remote_user 'sunaybhat' --data_key "Baseline" --poison_type 'BullseyePolytope' --config_overrides 'LINEAR_TRANSFER' --v;
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cinic10_imagenet_nf[32]]_Steps[150]_T[0.0001]" --config_overrides 'LINEAR_TRANSFER_BP';
 
 # Train Classifier
 python3 train_classifier.py --remote_user 'sunaybhat' --data_key "Baseline" --poison_type 'GradientMatching';
