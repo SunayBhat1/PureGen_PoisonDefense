@@ -185,16 +185,19 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
         poison_tuple_list, poison_indices, target_mask_label = load_poisons(args,target_index)
 
-        num_classes,num_per_label = dataset_info[args.poison_mode][args.dataset]['num_classes'],dataset_info[args.poison_mode][args.dataset]['num_per_label']
+        num_classes,num_per_class = dataset_info[args.poison_mode][args.dataset]['num_classes'],dataset_info[args.poison_mode][args.dataset]['num_per_label']
 
         if args.poison_mode == 'BullseyePolytope_Bench':
             base_data = PoisonedDataset_Bench(args.data_dir,args.dataset,poison_tuple_list,
                                                             2500,poison_indices)
         else:
+            if args.poison_mode != 'from_scratch':
+                num_per_class = args.num_per_class
+            
             base_data = Poisoned_Dataset_Base(base_data,
                                                 poison_tuple_list=poison_tuple_list,
                                                 poison_indices = poison_indices,
-                                                num_per_label=num_per_label, num_classes=num_classes,
+                                                num_per_label=num_per_class, num_classes=num_classes,
                                                 transforms=transforms.Compose([transforms.ToTensor()]),
                                                 )
                 
@@ -992,7 +995,7 @@ def get_optimizer(args,target_net):
             xm.master_print(f'Using AdamWq with q={args.q} and weight decay={args.weight_decay} lr={args.lr}')
             optimizer = AdamWq(target_net.parameters(), lr=args.lr,weight_decay=args.weight_decay,q=args.q)
 
-    elif args.poison_mode in ['linear_transfer','fine_tine']:
+    elif args.poison_mode in ['linear_transfer','fine_tune_transfer']:
 
         if args.poison_mode == 'fine_tune':
             params = target_net.parameters()
@@ -1065,7 +1068,7 @@ def get_poisons_target(args,target_index,test_transforms,target_mask=None):
         return target_img, target_orig_label
     
     elif args.poison_type == 'BullseyePolytope':
-        target_img = fetch_target_polytope(6, target_index, args.num_per_class_bp, path=os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), subset='others',transform=test_transforms)
+        target_img = fetch_target_polytope(6, target_index, args.num_per_class, path=os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), subset='others',transform=test_transforms)
         return target_img, 6
     
     elif args.poison_type == 'BullseyePolytope_Bench':
