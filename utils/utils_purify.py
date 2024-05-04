@@ -270,6 +270,9 @@ def process_args(args, rank):
     for arg_name in arg_names:
         arg_value = getattr(args, arg_name)
 
+        if arg_value is None:
+            continue
+
         # Check if the argument value is a list
         if isinstance(arg_value, list):
             try:

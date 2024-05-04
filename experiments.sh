@@ -2,9 +2,11 @@
 # Nodes Lists #
 ###############
 
-### Node 7 Purify BP Linear Transfer
+### Node 7 Purify BP Fine Tune Transfer
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 150 --poison_type 'TransferBase' --v;
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 150 --poison_type 'BullseyePolytope' --poison_mode 'linear_transfer';
+
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 150 --poison_type 'BullseyePolytope' --poison_mode 'fine_tune_transfer' --iters_bp 1500 --net_repeat_bp 3 --num_images_bp 5 --v;
 
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None --poison_type 'BullseyePolytope' --poison_mode 'linear_transfer';
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None --poison_type 'TransferBase';
