@@ -1068,7 +1068,13 @@ def load_poisons(args,target_index):
 
 def get_poisons_target(args,target_index,test_transforms,target_mask=None):
     if args.poison_type =='GradientMatching':
-        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'PoisonDefense/Poisons/GradientMatching/{args.dataset}/ResNet34_250/{target_index}'), test_transforms)
+        if args.dataset == 'cifar10':
+            target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'Poisons/GradientMatching/{args.dataset}/{target_index}'), test_transforms)
+        elif args.dataset == 'tinyimagenet':
+            target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'Poisons/GradientMatching/{args.dataset}/ResNet34_250/{target_index}'), test_transforms)
+        else:
+            raise Exception(f"Dataset {args.dataset} not supported for GradientMatching poison mode")
+        
         return target_img, target_orig_label
     
     elif args.poison_type == 'BullseyePolytope':
@@ -1076,7 +1082,7 @@ def get_poisons_target(args,target_index,test_transforms,target_mask=None):
         return target_img, 6
     
     elif args.poison_type == 'BullseyePolytope_Bench':
-        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'PoisonDefense/Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}'), test_transforms)
+        target_img, target_orig_label = get_target_poison(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}'), test_transforms)
         return target_img, target_orig_label
 
     elif args.poison_type == 'Narcissus':

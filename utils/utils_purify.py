@@ -83,7 +83,12 @@ def get_poisons(args,target_index):
     """
     
     if args.poison_type == 'GradientMatching':
-        poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/GradientMatching/',args.dataset,'ResNet34_250',f'{target_index}'))
+        if args.dataset == 'cifar10':
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/GradientMatching/',args.dataset,f'{target_index}'))
+        elif args.dataset == 'tinyimagenet':
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/GradientMatching/',args.dataset,'ResNet34_250',f'{target_index}'))
+        else:
+            raise ValueError(f"Dataset {args.dataset} not supported for Gradient Matching attack.")
 
     elif args.poison_type == 'Narcissus':
         if args.poison_mode == 'from_scratch':

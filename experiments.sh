@@ -2,6 +2,17 @@
 # Nodes Lists #
 ###############
 
+### Node 7 Purify GM
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cinic10_imagenet_nf[32]' --ebm_lang_steps 150 --poison_type 'GradientMatching';
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None --poison_type 'GradientMatching';
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None;
+
+# Train Classifier
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "Baseline" --poison_type 'GradientMatching';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBM[cinic10_imagenet_nf[32]]_Steps[150]_T[0.0001]" --poison_type 'GradientMatching';
+
+
 ### Node 1Purify Poisoned EBM
 (
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_name 'cifar10_NS[num=5000_size=32_eps=8]_nf[32]' --num_proc 8 --ebm_lang_steps 2000,1000,750,150;
