@@ -100,9 +100,13 @@ def get_poisons(args,target_index):
             else:
                 poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
-        elif args.poison_mode == 'transfer':
+        elif args.poison_mode == 'fine_tune_transfer':
             poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list=None, transfer_subset=True)
+            
+        else:
+            raise ValueError(f"Poison mode {args.poison_mode} not supported for Narcissus attack.")
+        
     elif args.poison_type == 'BullseyePolytope':
 
         inverse_transform = transforms.Compose([transforms.Normalize(mean=[-i/j for i,j in zip(cifar_mean, cifar_std)], std=[1/j for j in cifar_std]),transforms.ToPILImage()])
