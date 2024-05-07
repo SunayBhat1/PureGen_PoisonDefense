@@ -199,7 +199,7 @@ if __name__ == '__main__':
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
     args_diff.add_argument('--diff_model', default='DM_UNET', type=none_or_str, choices=[None,'DM_UNET','HF_NCSNPP_PRE','HF_DDPM_PRE','DM_UNET_SMALL'],help='type of diffusion model to use')
-    args_diff.add_argument('--diff_name', default='cincic10_imagenet_DDPM[250]_nf[L]', type=str_or_str_list, help='path to the diffusion model')
+    args_diff.add_argument('--diff_name', default='cinic10_imagenet_DDPM[250]_nf[L]', type=str_or_str_list, help='path to the diffusion model')
     args_diff.add_argument('--unet_channels', default='L', type=str, help='number of channels for the unet model',choices=['S','M','L'])
     args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
     args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')

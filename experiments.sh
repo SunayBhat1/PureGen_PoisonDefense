@@ -2,94 +2,98 @@
 # Nodes Lists #
 ###############
 
-### Node1: PoisonedGen Train EBM R18 HLB
+### Node9: Mix Purify
 (
-for i in 150; do     
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=8]_nf[128]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';    
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=16]_nf[128]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_nf[128]]_Steps[150]_T[0.0001]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-done;
-
-for i in 750 1000 2000; do     
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=8]_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';     
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_NS[num=5000_size=32_eps=16]_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-done; 
+python3 purify.py --remote_user 'sunaybhat' --num_proc 8 \
+    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
+    --diff_T 100,75,50,25,100,75,50,25;
+python3 purify.py --remote_user 'sunaybhat' --diff_reverse_only --num_proc 8 \
+    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
+    --diff_T 100,75,50,25,100,75,50,25;
+python3 purify.py --remote_user 'sunaybhat' --num_proc 8 \
+    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
+    --diff_T 100,75,50,25,100,75,50,25 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_reverse_only --num_proc 8 \
+    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
+    --diff_T 100,75,50,25,100,75,50,25 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 )
 
-### Node4: PoisonedGen Train DM R18 HLB
-# (
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]' --num_proc 8 --diff_T 150,125,100,75;
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]' --num_proc 8 --diff_T 150,125,100,75 --poison_type 'Narcissus';
-# python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]' --num_proc 8 --diff_T 150,125,100,75 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-
-# # Train classifer
-# for i in 150 125 100 75; do
-#     python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]]_T[$i]" --poison_type 'Narcissus';
-#     python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
-# done
-# )
-
-### Node 3 NTG Res18 HLB Trainig
+### Node1
 (
-    for i in 100 125 150; do # 100 125 150
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[office_home_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[oxford_iiit_pet_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[fgvc_aircraft_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[flowers102_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[food101_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[lfw_people_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[textures_DDPM[250]_nf[L]]_T[$i]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-    done
+)
 
-    for i in 700 800 850 ; do # 700 750 800 850 
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[office_home_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[oxford_iiit_pet_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[fgvc_aircraft_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[flowers102_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[food101_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[lfw_people_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-        python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[textures_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'NeuralTangent' --config_overrides 'R18_HLB';
-    done
+## Node4: PoisonedGen Train DM R18 HLB
+(
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]' --num_proc 8 --diff_T 150,125,100,75;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]' --num_proc 8 --diff_T 150,125,100,75 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_name 'cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]' --num_proc 8 --diff_T 150,125,100,75 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+
+# Train classifer
+for i in 150 125 100 75; do
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]]_T[$i]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]_NS[num=5000_size=32_eps=16]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
+done
+)
+
+### Node 3 NTG EBM_DM Testing
+(
+python3 purify.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' --num_proc 8 \
+    --ebm_lang_steps 500,500,500,500,300,300,300,300 \
+    --diff_T 100,75,50,25,100,75,50,25;
+python3 purify.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' --diff_reverse_only --num_proc 8 \
+    --ebm_lang_steps 500,500,500,500,300,300,300,300 \
+    --diff_T 100,75,50,25,100,75,50,25;
 )
 
 
 ### Node2: Purify EBM POOD
 (
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8   \
-    --ebm_name 'cifar10_nf[128]','cifar10_nf[128]','cifar10_nf[128]','cifar10_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]' \
-    --ebm_lang_steps 2000,1000,750,150,2000,1000,750,150;
+    --ebm_name 'cifar10_nf[128]','cifar10_nf[128]','cifar10_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]','cinic10_imagenet_nf[128]' \
+    --ebm_lang_steps 2000,1000,750,2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8  \
-    --ebm_name 'flowers102_nf[128]','flowers102_nf[128]','flowers102_nf[128]','flowers102_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]' \
-    --ebm_lang_steps 2000,1000,750,150,2000,1000,750,150;
+    --ebm_name 'flowers102_nf[128]','flowers102_nf[128]','flowers102_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]','fgvc_aircraft_nf[128]' \
+    --ebm_lang_steps 2000,1000,750,2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8  \
-    --ebm_name 'food101_nf[128]','food101_nf[128]','food101_nf[128]','food101_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]' \
-    --ebm_lang_steps 2000,1000,750,150,2000,1000,750,150;
+    --ebm_name 'food101_nf[128]','food101_nf[128]','food101_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]','lfw_people_nf[128]' \
+    --ebm_lang_steps 2000,1000,750,2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8  \
-    --ebm_name 'office_home_nf[128]','office_home_nf[128]','office_home_nf[128]','office_home_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]' \
-    --ebm_lang_steps 2000,1000,750,150,2000,1000,750,150;
+    --ebm_name 'office_home_nf[128]','office_home_nf[128]','office_home_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]','oxford_iiit_pet_nf[128]' \
+    --ebm_lang_steps 2000,1000,750,2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8  \
     --ebm_name 'textures_nf[128]' \
-    --ebm_lang_steps 2000,1000,750,150;
-)
+    --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_lang_steps 150 --poison_type 'Narcissus' --num_proc 8 \
+    --ebm_name 'cifar10_nf[128]',cinic10_imagenet_nf[128],flowers102_nf[128],fgvc_aircraft_nf[128],food101_nf[128],lfw_people_nf[128],office_home_nf[128],oxford_iiit_pet_nf[128];
+
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_lang_steps 150 --ebm_name 'textures_nf[128]' --poison_type 'Narcissus';
 
 
+# Train Classifier
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[flowers102_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[fgvc_aircraft_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[food101_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[lfw_people_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[office_home_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[oxford_iiit_pet_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
+python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[textures_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus';
 
-  
-### Node4: Purify POOD DM (cifar10,cinic10_imagenet)
-(
-#train classifier
-for i in 150 125 100 75; do
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
+for i in 2000 1000 750; do
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cifar10_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[flowers102_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[fgvc_aircraft_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[food101_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[lfw_people_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[office_home_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[oxford_iiit_pet_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
+    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "EBMSNGAN32[textures_nf[128]]_Steps[$i]_T[0.0001]" --poison_type 'Narcissus' --noise_eps_narcissus 16;
 done
 )
+
 
 ### Node5: Purify POOD DM (oxford, food, aircraft)
 (
@@ -106,24 +110,12 @@ done
 
 ### Node7: Purify POOD DM (flowers, office-home)
 (
-#train classifier
-for i in 150 125 100 75; do
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[flowers102_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[flowers102_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[office_home_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[office_home_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
-done
+
 )
 
 ### Node8: Purify POOD DM (lfw_people, textures)
 (
-#train classifier
-for i in 150 125 100 75; do
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[lfw_people_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[lfw_people_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[textures_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --config_overrides 'R18_HLB';
-    python3 train_classifier.py --remote_user 'sunaybhat' --data_key "DM_UNET[textures_DDPM[250]_nf[L]]_T[$i]" --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
-done
+
 )
 
 
@@ -182,10 +174,12 @@ rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_M
 rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/PureGen_Models/* sunaybhat@node8:/home/sunaybhat/data/PureGen_Models/;
 
 # Copy Poisons Up to Node
-rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/Poisons/* sunaybhat@node8:/home/sunaybhat/data/Poisons/;
+rsync -av --exclude='.DS_Store' /Users/sunaybhat/Documents/GitHub/data/Poisons/* sunaybhat@node2:/home/sunaybhat/data/Poisons/;
 
 # Copy Cifar10 Split Data Up to Node
 scp /Users/sunaybhat/Documents/GitHub/Research/data/CIFAR10_TRAIN_Splith sunaybhat@Calt3_dani:/home/sunaybhat/data/;
+
+
 
 
 (
