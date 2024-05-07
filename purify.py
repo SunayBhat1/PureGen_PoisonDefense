@@ -119,6 +119,7 @@ def main(rank, args):
                 data_key += f'HF_DDPM[google/ddpm-cifar10-32]_T[{args.diff_T}]'
             else:
                 data_key += f'_{args.diff_model}[{args.diff_name.replace("/","_")}]_T[{args.diff_T}]'
+                if args.diff_reverse_only: data_key += '_ReverseOnly'
         if args.jpeg_compression is not None:
             data_key += f'_JPEG[{args.jpeg_compression}]'
         if args.purify_reps > 1: 
