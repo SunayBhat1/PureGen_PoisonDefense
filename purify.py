@@ -103,7 +103,7 @@ def main(rank, args):
         ### Purify the dataset ###
         start_purify = time.time()
         purified_data = PurifyClass.purify(train_loader,ebm_lang_steps=args.ebm_lang_steps,ebm_lang_temp=args.ebm_lang_temp,
-                        diff_steps=args.diff_T,
+                        diff_steps=args.diff_T, reverse_only=args.diff_reverse_only,
                         purify_reps=args.purify_reps,pbar=purify_pbar)
 
         purify_time = time.time() - start_purify
@@ -205,6 +205,7 @@ if __name__ == '__main__':
     args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')
     args_diff.add_argument('--num_res_blocks', default=2, type=int, help='number of res blocks in the unet')
     args_diff.add_argument('--diff_T', default=50, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
+    args_diff.add_argument('--diff_reverse_only', default=False, action='store_true', help='reverse only for the unconditional diffuion model')
 
     ### Poison Arguments ###
     parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus','GradientMatching','TransferBase','BullseyePolytope','BullseyePolytope_Bench','NeuralTangent'],help='type of poison to generate')

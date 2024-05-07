@@ -46,7 +46,7 @@ class PureDefense:
 
     def purify(self, data_loader, 
                ebm_lang_steps=100,ebm_lang_temp=1e-4,
-               diff_steps=125,
+               diff_steps=125,reverse_only=False,
                purify_reps=1,
                pbar=True):
         """
@@ -81,8 +81,7 @@ class PureDefense:
                         ).squeeze(0)
                     
                 if self.DM is not None:
-                    input = self.diff_purify(input,diff_steps)
-
+                    input = self.diff_purify(input,diff_steps,reverse_only=reverse_only)
                 if self.device_type =='xla': xm.mark_step()
 
             if self.device_type =='xla': xm.mark_step()
