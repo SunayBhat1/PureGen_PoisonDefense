@@ -2,9 +2,8 @@
 # Nodes Lists #
 ###############
 
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key 'EBMSNGAN32[cifar10_nf[128]]_Steps[150]_T[0.0001]'  --ebm_filter 0.1;
 
-### Node1
-### Node4:
 ### Node2:
 
 ### Node 3: Mix Purify NTGA
@@ -19,7 +18,7 @@ python3 purify.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' --num_
 python3 purify.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' --diff_reverse_only --num_proc 8 \
     --ebm_lang_steps 750,650,750,650,500,300,500,300 \
     --diff_T 50,50,25,25,150,150,125,125;
-)
+)ebm_filtering
 
 
 ### Node7: EBM+Diff Purify Narc Eps 16

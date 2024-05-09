@@ -97,6 +97,8 @@ def check_arg_errors(args):
         raise ValueError('selected_indices only supported for from_scratch attacks')
     if args.baseline_defense != 'None' and args.data_key != 'Baseline':
         raise ValueError('Baseline defenses only supported for baseline data')
+    if args.ebm_filter is not None and args.data_key == 'Baseline':
+        raise ValueError('EBM filter only supported when using a purified data key data')
     
 def setup_directories(args):
     # Setup directories for remote server
@@ -114,13 +116,13 @@ def setup_directories(args):
 # Train Data Utils #
 ####################
 
-def get_train_data(args,target_index,device):
+def get_train_data(args,target_index,device,ebm_model=None):
 
     test_trigger_loaders,poison_target_image, target_mask_label = None,None,None
 
     train_transforms = get_train_transforms(args)
 
-    train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device)
+    train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device,ebm_model)
 
     if 'HLB' in args.model and args.dataset in ['cifar10']:
         train_loader = train_data
@@ -153,7 +155,7 @@ def get_train_data(args,target_index,device):
     
     return train_data, train_loader, p_count, test_trigger_loaders,poison_target_image, target_mask_label
 
-def get_base_poisoned_dataset(args,target_index, train_transforms,device):
+def get_base_poisoned_dataset(args,target_index, train_transforms,device,ebm_model=None):
 
     # NTG Attack Data
     if args.poison_type == 'NeuralTangent':
@@ -178,6 +180,10 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
 
     # Poison Data
     else:
+
+        if args.ebm_filter is not None:
+            unpurified_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Baseline.pt'))
+
         if args.poison_mode == 'from_scratch' or args.poison_type == 'BullseyePolytope_Bench':
             base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
         elif args.poison_mode in ['linear_transfer','fine_tune_transfer']:
@@ -200,6 +206,15 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
                                                 num_per_label=num_per_class, num_classes=num_classes,
                                                 transforms=transforms.Compose([transforms.ToTensor()]),
                                                 )
+
+            if args.ebm_filter is not None:
+                unpurified_data = Poisoned_Dataset_Base(unpurified_data,
+                                                    poison_tuple_list=poison_tuple_list,
+                                                    poison_indices = poison_indices,
+                                                    num_per_label=num_per_class, num_classes=num_classes,
+                                                    transforms=transforms.Compose([transforms.ToTensor()]),
+                                                    )
+            
                 
     base_loader = data.DataLoader(base_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
@@ -208,6 +223,12 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
     else:
         train_data = PoisonedDataset(base_loader, poisoned = True, transform=train_transforms)
 
+
+    if args.ebm_filter is not None:
+        unpurified_loader = torch.utils.data.DataLoader(unpurified_data, batch_size=256, shuffle=False,num_workers=4)
+        unpurified_data = PoisonedDataset(unpurified_loader, poisoned = True, transform=train_transforms)
+        base_data = replace_high_energy_samples(unpurified_data, train_data, ebm_model, args.ebm_filter,device)
+
     if 'HLB' in args.model and args.dataset == 'cifar10':
         aug = {'flip': args.hlb_flip}
         if args.hlb_translate is not None: aug['translate'] = args.hlb_translate
@@ -215,6 +236,35 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device):
         train_data = CifarLoader(train_data.data, train=True, batch_size=args.batch_size, aug=aug, device=device,dataset_name=args.dataset)
 
     return train_data, target_mask_label
+
+def replace_high_energy_samples(base_data, purified_data, ebm_model, purify_amount, device):
+
+    forward_norm = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+    energy_list = []
+
+    if xm.is_master_ordinal():
+        pbar = tqdm(total=len(base_data.data), desc="Collecting Sample Energies")
+
+    with torch.no_grad():
+        for input, target, index, p in base_data.data:
+            
+            input = forward_norm(input).unsqueeze(0).to(device)       
+            energy = ebm_model(input.to(device)).item()
+            energy_list.append(energy)
+
+            xm.mark_step()
+            if xm.is_master_ordinal(): pbar.update(1)
+
+    _, indices = torch.topk(torch.tensor(energy_list), int(purify_amount * len(energy_list)), largest=True)
+
+    # Replace unpurified with purified for highest energiues
+    xm.master_print(f"Replacing {len(indices)} high energy samples with purified samples")
+    for i in indices:
+        base_data.data[i] = purified_data.data[i]
+
+    return base_data
+
 
 ### Data Loaders ###
 
@@ -343,6 +393,27 @@ class Poisoned_Dataset_Base(data.Dataset):
         return self.transforms(img), label, index, p
 
 class Simple_Dataset_Base(data.Dataset):
+    def __init__(self, base_dataset, transforms):
+        """
+        Args:
+            base_dataset (Dataset): The base dataset.
+            transforms (callable): A function/transform that takes in an PIL image and returns a transformed version.
+        """
+
+        self.base_dataset = base_dataset
+        self.img_label_list = [(img, label) for img, label in base_dataset]
+        self.transforms = transforms
+        self.valid_indices = list(range(len(self.img_label_list)))
+
+    def __len__(self):
+        return len(self.valid_indices)
+
+    def __getitem__(self, index):
+        idx = self.valid_indices[index]
+        img, label = self.img_label_list[idx]
+        return self.transforms(img), label
+
+class Simple_Poison_Dataset(data.Dataset):
     def __init__(self, base_dataset, transforms):
         """
         Args:

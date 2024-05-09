@@ -21,6 +21,8 @@ except: pass
 from utils.utils import *
 from utils.utils_clf import *
 from utils.utils_baselines import *
+from utils.EBM_models import create_ebm
+
 
 def main(rank, args):
 
@@ -45,10 +47,17 @@ def main(rank, args):
     # Load Training Data #
     ######################
 
+    if args.ebm_filter is not None:
+        ebm_model = create_ebm('EBMSNGAN32',128)
+        ebm_model.load_state_dict(torch.load(os.path.join(args.data_dir,args.ebm_path)))
+        ebm_model.to(device)
+    else:
+        ebm_model = None
+
     if args.baseline_defense == 'Friendly':
         train_data, train_loader, train_loader_noaugs, p_count, test_trigger_loaders,poison_target_image, target_mask_label = get_train_data(args, target_index, device)
     else:
-        train_data, train_loader, p_count, test_trigger_loaders,poison_target_image, target_mask_label = get_train_data(args, target_index, device)
+        train_data, train_loader, p_count, test_trigger_loaders,poison_target_image, target_mask_label = get_train_data(args, target_index, device,ebm_model=ebm_model)
 
     if args.verbose:
         if 'HLB' in args.model and args.dataset in ['cifar10']: print(f'Loaded training data {len(train_loader.images)} samples, {p_count} poisoned or {p_count/len(train_loader.images):.2%} poisoned')
@@ -272,6 +281,10 @@ if __name__ == '__main__':
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','clean','linear_transfer','fine_tune_transfer'],help='mode of attack')
     parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus','NeuralTangent','GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
     parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','JPEG','Epic','Friendly'],help='type of defense to use')
+
+    ### EBM Filter Arguments ###
+    parser.add_argument('--ebm_filter', default=None, type=float, help='EBM highest energy % to purify')
+    parser.add_argument('--ebm_path', default='PureGen_Models/EBMSNGAN32/cinic10_imagenet_nf[128].pt', type=str, help='path to the EBM model')
     
     ### Poison Arguments ###
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
