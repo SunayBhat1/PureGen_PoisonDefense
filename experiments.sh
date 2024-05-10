@@ -2,136 +2,160 @@
 # Nodes Lists #
 ###############
 
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key 'EBMSNGAN32[cifar10_nf[128]]_Steps[150]_T[0.0001]'  --ebm_filter 0.1;
+### Node5
 
 ### Node1: EBM Filter
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_filter 0.1 --v; 
+(
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8 \
+    --ebm_lang_steps 1000,750,500,150;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+    --ebm_lang_steps 1000,750,500,150;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --num_proc 8 --poison_type 'Narcissus' \
+    --ebm_lang_steps 1000,750,500,150;
+
+# Train Narc Basdeines
+python3 train_classifier.py --remote_user 'sunaybhat';
+python3 train_classifier.py --remote_user 'sunaybhat' --noise_eps_narcissus 16;
+
+for i in 1000 750 500 150; do
+    for j in 0.05 0.1 0.2 0.3; do
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --ebm_filter $j \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]";
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --ebm_filter $j \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]";
+    done;
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]";
+
+done;
+)
+
+# python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --num_proc 8 \
+#     --ebm_lang_steps 50,50,50,50,25,25,25,25 \
+#     --diff_T 75,50,25,10,75,50,25,10;
+# python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
+#     --ebm_lang_steps 50,50,50,50,25,25,25,25 \
+#     --diff_T 75,50,25,10,75,50,25,10;
 
 ### Node2: Reps
 (
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --num_proc 8 \
-    --ebm_lang_steps 50,50,50,50,25,25,25,25 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 50,50,50,50,25,25,25,25 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --num_proc 8 \
-    --ebm_lang_steps 50,50,50,50,25,25,25,25 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 50,50,50,50,25,25,25,25 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --num_proc 8 \
-    --ebm_lang_steps 50,50,50,50,25,25,25,25 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 50,50,50,50,25,25,25,25 \
-    --diff_T 75,50,25,10,75,50,25,10;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 10 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 10 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 25 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 25 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 50 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 50 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 75 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 75 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 100 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 10 --ebm_lang_steps 100 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
+    --purify_reps 9,8,7,6,5,4,3,2;
 
 # Train Classifier
-for i in 75 50 25 10; do
-    for j in 2 3 4; do
+for i in 10 25 50 75 100; do
+    for j in 2 3 4 5 6 7 8 9; do
         python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
-            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[25]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
-        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
-            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[50]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[$i]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[10]_reps$j";
     done;
 done;
 )
 
 ### Node 4: Mix Purify NTGA
 (
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
+# Train Classifier
+for i in 75 50 25 10; do
+    for j in 2 3 4; do
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[250]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+    done;
+done;
 )
 
 
 ### Node7: EBM+Diff Purify Narc Eps 16
 (
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --num_proc 8 \
-    --ebm_lang_steps 500,500,500,500,350,350,350,350 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 500,500,500,500,350,350,350,350 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --num_proc 8 \
-    --ebm_lang_steps 500,500,500,500,350,350,350,350 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 500,500,500,500,350,350,350,350 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --num_proc 8 \
-    --ebm_lang_steps 500,500,500,500,350,350,350,350 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 500,500,500,500,350,350,350,350 \
-    --diff_T 75,50,25,10,75,50,25,10;
+# Train Classifier
+for i in 75 50 25 10; do
+    for j in 2 3 4; do
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[350]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[500]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+    done;
+done;
 )
 
 ### Node8: EBM+Diff Purify Narc Eps 16
 (
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
+# Train Classifier
+for j in 2 3 4; do
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[10]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]_reps$j";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[10]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[100]_reps$j";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[25]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]_reps$j";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[25]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[100]_reps$j";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[1000]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[25]_reps$j";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[1000]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[10]_reps$j";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[750]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[25]_reps$j";
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 \
+        --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[750]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[10]_reps$j";
+done;
 )
 
 
-### Node3: NTGA Mix Extremes
+
+
+### Node3: NTGA Reps
 (
 python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'NeuralTangent' --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
+    --ebm_lang_steps 125,100,75,50,125,100,75,50 \
+    --diff_T 50,50,50,50,25,25,25,25;
 python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --poison_type 'NeuralTangent' --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
+    --ebm_lang_steps 125,100,75,50,125,100,75,50 \
+    --diff_T 50,50,50,50,25,25,25,25;
 python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --poison_type 'NeuralTangent' --num_proc 8 \
-    --ebm_lang_steps 10,10,25,25,1000,1000,750,750 \
-    --diff_T 125,100,125,100,25,10,25,10;
+    --ebm_lang_steps 125,100,75,50,125,100,75,50 \
+    --diff_T 50,50,50,50,25,25,25,25;
+
+# Train Classifier
+for i in 50 25; do
+    for j in 2 3 4; do
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[125]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[100]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[75]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+        python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'NeuralTangent' \
+            --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[50]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[$i]_reps$j";
+    done;
+done;
 )
 
-### Node5: Mix Purify NTGA
-(
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 2 --poison_type 'NeuralTangent' --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 3 --poison_type 'NeuralTangent' --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-python3 purify.py --remote_user 'sunaybhat' --purify_reps 4 --poison_type 'NeuralTangent' --num_proc 8 \
-    --ebm_lang_steps 250,250,250,250,150,150,150,150 \
-    --diff_T 75,50,25,10,75,50,25,10;
-)
+:
 
 
 ############################

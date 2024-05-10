@@ -187,7 +187,7 @@ if __name__ == '__main__':
 
     ### Purification Arguments ###
 
-    parser.add_argument('--purify_reps', default=1, type=int, help='number of purification repetitions (when using both EBM and Diffusion)')
+    parser.add_argument('--purify_reps', default=1, type=int_or_int_list, help='number of purification repetitions (when using both EBM and Diffusion)')
 
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
