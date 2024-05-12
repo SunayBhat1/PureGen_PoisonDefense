@@ -28,6 +28,12 @@ def main(rank, args):
     if args is None: 
         xm.rendezvous('purification end!')
         return
+    
+    # Raise errors
+    if args.purify_reps > 1 and (args.ebm_model is None or args.diff_model is None):
+        raise ValueError('When purify_reps>1, both EBM and Diffusion models must be provided')
+    if args.purify_reps > 1 and (args.ebm_lang_steps == 0 or args.diff_T == 0):
+        raise ValueError('When purify_reps>1, ebm_lang_steps and diff_T must be greater than 0')
 
     # Get the data loader and number of target indices
     if args.poison_type in [None,'NeuralTangent','TransferBase']:
@@ -187,7 +193,7 @@ if __name__ == '__main__':
 
     ### Purification Arguments ###
 
-    parser.add_argument('--purify_reps', default=1, type=int, help='number of purification repetitions (when using both EBM and Diffusion)')
+    parser.add_argument('--purify_reps', default=1, type=int_or_int_list, help='number of purification repetitions (when using both EBM and Diffusion)')
 
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
@@ -221,12 +227,6 @@ if __name__ == '__main__':
 
     # Parse the arguments
     args = parser.parse_args()
-
-    # Raise errors
-    if args.purify_reps > 1 and (args.ebm_model is None or args.diff_model is None):
-        raise ValueError('When purify_reps>1, both EBM and Diffusion models must be provided')
-    if args.purify_reps > 1 and (args.ebm_lang_steps == 0 or args.diff_T == 0):
-        raise ValueError('When purify_reps>1, ebm_lang_steps and diff_T must be greater than 0')
     
     # Print the arguments
     if args.verbose:
