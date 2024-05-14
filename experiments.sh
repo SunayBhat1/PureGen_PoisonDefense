@@ -21,8 +21,7 @@ python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' 
 )
 
 
-
-### Node3: R18 HLB Baselines Gaussian Noise
+### Node3: R18 HLB Baselines Epic
 (
 python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'R18_HLB' --baseline_defense 'Epic' --epic_subset_size 0.1;
 python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB' --baseline_defense 'Epic' --epic_subset_size 0.1;
@@ -33,14 +32,11 @@ python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' 
 )
 
 
-
-
-
 ### Node4: R18 HLB Baselines Narc
 python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'R18_HLB';
 python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
 
-### Node1: EBM Filter
+### Node5: EBM Filter
 (
 for i in 1000 750 500 150; do
     for j in 0.8 0.9; do

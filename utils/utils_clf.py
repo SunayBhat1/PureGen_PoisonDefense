@@ -229,7 +229,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device,ebm_mod
         unpurified_data = PoisonedDataset(unpurified_loader, poisoned = True, transform=train_transforms)
         train_data = replace_high_energy_samples(unpurified_data, train_data, ebm_model, args.ebm_filter,device)
 
-    if 'HLB' in args.model and args.dataset == 'cifar10' and args.baseline_defense != 'None':
+    if 'HLB' in args.model and args.dataset == 'cifar10' and args.baseline_defense == 'None':
         aug = {'flip': args.hlb_flip}
         if args.hlb_translate is not None: aug['translate'] = args.hlb_translate
         if args.hlb_cutout is not None: aug['cutout'] = args.hlb_cutout
