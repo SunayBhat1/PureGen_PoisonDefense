@@ -1068,7 +1068,7 @@ def get_optimizer(args,target_net):
 
     elif args.poison_mode in ['linear_transfer','fine_tune_transfer']:
 
-        if args.poison_mode == 'fine_tune':
+        if args.poison_mode == 'fine_tune_transfer':
             params = target_net.parameters()
         else:
             params = target_net.get_penultimate_params_list()
