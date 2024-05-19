@@ -56,32 +56,46 @@ python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' 
 python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' 'NARC_10' --baseline_defense 'Epic' --epic_subset_size 0.3;
 )
 
-### Node4: R18 HLB EBM/DM
+### Node4: R18 HLB Reps
 (
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_lang_steps 150 --poison_type 'Narcissus' --num_images_narcissus 5000;
-python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 --num_images_narcissus 5000;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 125,100,75 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 --num_images_narcissus 5000;
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 125,100,75 --poison_type 'Narcissus' --num_proc 8 --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 50 --ebm_lang_steps 25,10 --purify_reps 7,5 --num_proc 8;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 50 --ebm_lang_steps 25,10 --purify_reps 7,5 --num_proc 8 --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --diff_T 50 --ebm_lang_steps 25,10 --purify_reps 7,5 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 50 --ebm_lang_steps 25,10 --purify_reps 7,5 --num_proc 8 --poison_type 'Narcissus' --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 50 --ebm_lang_steps 25,10 --purify_reps 7,5 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_images_narcissus 5000;
 
 # Train Classifier
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]" --config_overrides 'R18_HLB' 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --config_overrides 'R18_HLB' 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[750]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[1000]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[2000]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[50]_EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[10]_T[0.0001]_reps7" --config_overrides 'R18_HLB';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[50]_EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[10]_T[0.0001]_reps7" --config_overrides 'R18_HLB' --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[50]_EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[10]_T[0.0001]_reps7" --config_overrides 'R18_HLB' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[50]_EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[10]_T[0.0001]_reps7" --config_overrides 'R18_HLB' 'NARC_10' --noise_eps_narcissus 16;
 )
 
 
-### Node5: Naive Combos
+### Node5: PGEN Filt
 (
-python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 250,150,150 --diff_T 125,125,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 250,150 --diff_T 125 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_images_narcissus 5000;
-python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_T 75 --poison_type 'Narcissus' --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 2000,150 --diff_model None;
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 2000,150 --diff_model None --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 2000 --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 2000,150 --diff_model None --poison_type 'Narcissus' --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 2000 --diff_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_images_narcissus 5000;
+
+python3 purify.py --remote_user 'sunaybhat' --diff_T 125 --ebm_model None;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 125 --ebm_model None --poison_type 'Narcissus';
+python3 purify.py --remote_user 'sunaybhat' --diff_T 125 --ebm_model None --poison_type 'Narcissus' --noise_eps_narcissus 16;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 125 --ebm_model None --poison_type 'Narcissus' --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --diff_T 125 --ebm_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_images_narcissus 5000;
+
 # Train Classifier
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[75]" --config_overrides 'R18_HLB';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[250]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]" --config_overrides 'R18_HLB' --ebm_filter 0.5;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[2000]_T[0.0001]" --config_overrides 'R18_HLB' --ebm_filter 0.5 --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]" --config_overrides 'R18_HLB' 'NARC_10' --ebm_filter 0.5;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[2000]_T[0.0001]" --config_overrides 'R18_HLB' 'NARC_10' --ebm_filter 0.5 --noise_eps_narcissus 16;
+
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --config_overrides 'R18_HLB' --ebm_filter 0.5;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --config_overrides 'R18_HLB' --ebm_filter 0.5 --noise_eps_narcissus 16;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --config_overrides 'R18_HLB' 'NARC_10' --ebm_filter 0.5;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --config_overrides 'R18_HLB' 'NARC_10' --ebm_filter 0.5 --noise_eps_narcissus 16;
 )
 
 
