@@ -4,16 +4,20 @@
 
 ### Node1: R18 HLB Baselines Friends
 (
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' --baseline_defense 'Friendly' --config_overrides 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' --baseline_defense 'Friendly' --config_overrides 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' --baseline_defense 'ResNet18' --friendly_noise_type 'friendly' 'gaussian' --config_overrides 'NARC_10';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB' --baseline_defense 'Friendly' --friendly_noise_type 'friendly' 'gaussian' --config_overrides 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly' --config_overrides 'ResNet18';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly' --noise_eps_narcissus 16 --config_overrides 'ResNet18';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly' --friendly_noise_type 'friendly' 'gaussian' --config_overrides 'ResNet18';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly'  --noise_eps_narcissus 16 --friendly_noise_type 'friendly' 'gaussian' --config_overrides 'ResNet18';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly' --config_overrides 'ResNet18' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly' --noise_eps_narcissus 16 --config_overrides 'ResNet18' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly' --friendly_noise_type 'friendly' 'gaussian' --config_overrides 'ResNet18' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --baseline_defense 'Friendly'  --noise_eps_narcissus 16 --friendly_noise_type 'friendly' 'gaussian' --config_overrides 'ResNet18' 'NARC_10';
 )
 
 ### Node2: R18 HLB Transfer Baselines
 (
 # Purify Transfer Base
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'TransferBase';
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'TransferBase' -v;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'TransferBase' --num_proc 8 --jpeg_compression 25,50,75,85;
 # Purify Narc Transfer
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --num_images_narcissus 20;
@@ -24,56 +28,56 @@ python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None -
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --num_images_narcissus 20 --noise_eps_narcissus 16 --num_proc 8 --jpeg_compression 25,50,75,85;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --num_images_narcissus 200 --num_proc 8 --jpeg_compression 25,50,75,85;
 python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --num_images_narcissus 200 --noise_eps_narcissus 16 --num_proc 8 --jpeg_compression 25,50,75,85;
-)
-
-(
 # Train Clf No Defense
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --config_overrides 'R18_HLB' 'NARC_1_TRANSFER';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_1_TRANSFER';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --config_overrides 'R18_HLB' 'NARC_10_TRANSFER';
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10_TRANSFER';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --config_overrides 'FINE_TUNE' 'NARC_1_TRANSFER' --v;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'FINE_TUNE' 'NARC_1_TRANSFER';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --poison_mode 'fine_tune_transfer' --config_overrides 'FINE_TUNE' 'NARC_10_TRANSFER';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'FINE_TUNE' 'NARC_10_TRANSFER';
 
 # Train Clf JPEG
 for i in 25 50 75 85; do
-    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --poison_mode 'fine_tune_transfer' --config_overrides 'R18_HLB' 'NARC_1_TRANSFER';
-    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_1_TRANSFER';
-    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --poison_mode 'fine_tune_transfer' --config_overrides 'R18_HLB' 'NARC_10_TRANSFER';
-    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10_TRANSFER';
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --poison_mode 'fine_tune_transfer' --config_overrides 'FINE_TUNE' 'NARC_1_TRANSFER';
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --noise_eps_narcissus 16 --config_overrides 'FINE_TUNE' 'NARC_1_TRANSFER';
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --poison_mode 'fine_tune_transfer' --config_overrides 'FINE_TUNE' 'NARC_10_TRANSFER';
+    python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "JPEG[$i]" --noise_eps_narcissus 16 --config_overrides 'FINE_TUNE' 'NARC_10_TRANSFER';
 done;
 )
 
 
-### Node3: R18 HLB Baselines Epic
+### Node3: R18 Baselines Epic
 (
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' --baseline_defense 'Epic' --epic_subset_size 0.1;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' --baseline_defense 'Epic' --epic_subset_size 0.1;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' --baseline_defense 'Epic' --epic_subset_size 0.2;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' --baseline_defense 'Epic' --epic_subset_size 0.2;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' --baseline_defense 'Epic' --epic_subset_size 0.3;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' --baseline_defense 'Epic' --epic_subset_size 0.3;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None --poison_type 'Narcissus' --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_model None --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_images_narcissus 5000;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' 'NARC_10' --baseline_defense 'Epic' --epic_subset_size 0.1;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' 'NARC_10' --baseline_defense 'Epic' --epic_subset_size 0.1;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' 'NARC_10' --baseline_defense 'Epic' --epic_subset_size 0.2;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' 'NARC_10' --baseline_defense 'Epic' --epic_subset_size 0.2;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --config_overrides 'ResNet18' 'NARC_10' --baseline_defense 'Epic' --epic_subset_size 0.3;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --noise_eps_narcissus 16 --config_overrides 'ResNet18' 'NARC_10' --baseline_defense 'Epic' --epic_subset_size 0.3;
 )
 
 ### Node4: R18 HLB EBM/DM
 (
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_lang_steps 150 --poison_type 'Narcissus' --num_images_narcissus 5000;
 python3 purify.py --remote_user 'sunaybhat' --diff_model None --ebm_lang_steps 2000,1000,750 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 125,100,75 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_proc 8 --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_T 125,100,75 --poison_type 'Narcissus' --num_proc 8 --num_images_narcissus 5000;
 
 # Train Classifier
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]" --config_overrides 'R18_HLB' --num_images_narcissus 5000;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[75]" --config_overrides 'R18_HLB' --num_images_narcissus 5000;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[750]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' --num_images_narcissus 5000;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[1000]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' --num_images_narcissus 5000;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[2000]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' --num_images_narcissus 5000;
-python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' --num_images_narcissus 5000;
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]" --config_overrides 'R18_HLB' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --config_overrides 'R18_HLB' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[750]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[1000]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[2000]_T[0.0001]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
+python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB' 'NARC_10';
 )
 
 
-### Node5: EBM Filter
+### Node5: Naive Combos
 (
 python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 250,150,150 --diff_T 125,125,75 --num_proc 8;
-python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 250,150 --diff_T 125 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16;
-python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_T 75 --poison_type 'Narcissus';
-
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 250,150 --diff_T 125 --num_proc 8 --poison_type 'Narcissus' --noise_eps_narcissus 16 --num_images_narcissus 5000;
+python3 purify.py --remote_user 'sunaybhat' --ebm_lang_steps 150 --diff_T 75 --poison_type 'Narcissus' --num_images_narcissus 5000;
 # Train Classifier
 python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[75]" --config_overrides 'R18_HLB';
 python3 train_classifier.py --remote_user 'sunaybhat' --poison_type 'Narcissus' --data_key "EBMSNGAN32[cinic10_imagenet_nf[128]]_Steps[150]_T[0.0001]_DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[125]" --noise_eps_narcissus 16 --config_overrides 'R18_HLB';
