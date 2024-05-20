@@ -60,7 +60,7 @@ def main(rank, args):
         train_data, train_loader, p_count, test_trigger_loaders,poison_target_image, target_mask_label = get_train_data(args, target_index, device,ebm_model=ebm_model)
 
     if args.verbose:
-        if 'HLB' in args.model and args.dataset in ['cifar10']: print(f'Loaded training data {len(train_loader.images)} samples, {p_count} poisoned or {p_count/len(train_loader.images):.2%} poisoned')
+        if 'HLB' in args.model and args.dataset in ['cifar10'] and args.baseline_defense == 'None': print(f'Loaded training data {len(train_loader.images)} samples, {p_count} poisoned or {p_count/len(train_loader.images):.2%} poisoned')
         else: print(f'Loaded training data {len(train_loader.dataset)} samples, {p_count} poisoned or {p_count/len(train_loader.dataset):.2%} poisoned')
 
     ##########################
@@ -77,7 +77,7 @@ def main(rank, args):
         poison_target_image, target_orig_label = get_poisons_target(args, target_index, test_transforms)
 
     if args.verbose: 
-        if 'HLB' in args.model and args.dataset in ['cifar10']: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.images)}')
+        if 'HLB' in args.model and args.dataset in ['cifar10'] and args.baseline_defense == 'None': print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.images)}')
         else: print(f'Loaded the test data with poison type {args.poison_type}, length {len(test_loader.dataset)}')
 
     ##############################

@@ -124,7 +124,7 @@ def get_train_data(args,target_index,device,ebm_model=None):
 
     train_data, target_mask_label = get_base_poisoned_dataset(args,target_index,train_transforms,device,ebm_model)
 
-    if 'HLB' in args.model and args.dataset in ['cifar10']:
+    if 'HLB' in args.model and args.dataset in ['cifar10'] and args.baseline_defense == 'None':
         train_loader = train_data
     else:
         train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,num_workers=4)
@@ -229,7 +229,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device,ebm_mod
         unpurified_data = PoisonedDataset(unpurified_loader, poisoned = True, transform=train_transforms)
         train_data = replace_high_energy_samples(unpurified_data, train_data, ebm_model, args.ebm_filter,device)
 
-    if 'HLB' in args.model and args.dataset == 'cifar10':
+    if 'HLB' in args.model and args.dataset == 'cifar10' and args.baseline_defense == 'None':
         aug = {'flip': args.hlb_flip}
         if args.hlb_translate is not None: aug['translate'] = args.hlb_translate
         if args.hlb_cutout is not None: aug['cutout'] = args.hlb_cutout
@@ -598,7 +598,7 @@ def get_test_dataset(args):
     else:
         raise Exception(f"Dataset {args.dataset} not supported in function get_test_dataset")
 
-    if 'HLB' in args.model and args.dataset in ['cifar10']:
+    if 'HLB' in args.model and args.dataset in ['cifar10'] and args.baseline_defense == 'None':
         test_loader = CifarLoader(test_data, train=False, batch_size=1000,dataset_name=args.dataset)
     else:
         test_loader = torch.utils.data.DataLoader(test_data, batch_size=128,num_workers=4)
@@ -1068,7 +1068,7 @@ def get_optimizer(args,target_net):
 
     elif args.poison_mode in ['linear_transfer','fine_tune_transfer']:
 
-        if args.poison_mode == 'fine_tune':
+        if args.poison_mode == 'fine_tune_transfer':
             params = target_net.parameters()
         else:
             params = target_net.get_penultimate_params_list()
@@ -1082,7 +1082,7 @@ def get_optimizer(args,target_net):
 
 def get_scheduler(args,optimizer,len_data):
     if 'HLB' in args.model:
-        if args.dataset == 'cifar10':
+        if args.dataset == 'cifar10' and args.baseline_defense == 'None':
             total_train_steps = np.ceil(len_data * args.epochs)
         else:
             total_train_steps = np.ceil(len_data / args.batch_size * args.epochs) + args.epochs
