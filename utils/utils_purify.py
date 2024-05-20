@@ -172,7 +172,7 @@ def get_poisoned_subset_narcissus(poisons_path, data_dir, dataset, label, poison
             base_dataset = torchvision.datasets.CIFAR10(root=data_dir, train=True, download=(not os.path.exists(os.path.join(data_dir, 'cifar-10-batches-py'))))
             train_labels = np.array(base_dataset.targets)
         elif dataset == 'cinic10':
-            base_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'CINIC-10/valid'))
+            base_dataset = torchvision.datasets.ImageFolder(root=os.path.join(data_dir, 'CINIC-10/train'))
             train_labels = np.array(base_dataset.targets)
         elif dataset in ['stl10', 'stl10_64']:
             base_dataset = torchvision.datasets.STL10(root=data_dir, split='train', download=(not os.path.exists(os.path.join(data_dir, 'stl10_binary'))))
