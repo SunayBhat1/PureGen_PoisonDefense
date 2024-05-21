@@ -146,7 +146,7 @@ def get_train_data(args,target_index,device,ebm_model=None):
                 raise ValueError('Friendly Defense not supported for this dataset')
             train_data_no_augs, _ = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
         else:
-            train_transforms_no_augs = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cifar_mean, std=cifar_std)])
+            train_transforms_no_augs = transforms.Compose([transforms.Normalize(mean=cifar_mean, std=cifar_std)])
             train_data_no_augs, _ = get_base_poisoned_dataset(args,target_index,train_transforms_no_augs,device)
 
         train_loader_noaugs = torch.utils.data.DataLoader(train_data_no_augs, batch_size=args.batch_size, shuffle=True,num_workers=4)
