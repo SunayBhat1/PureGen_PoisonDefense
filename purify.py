@@ -87,6 +87,9 @@ def main(rank, args):
             elif args.dataset == 'stl10':
                 train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.ToTensor())
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
+            elif args.dataset == 'cinic10':
+                train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'CINIC-10/train'), transform=torchvision.transforms.ToTensor())
+                train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
             elif args.dataset == 'stl10_64':
                 train_data = torchvision.datasets.STL10(root=args.data_dir, split='train', download=(not os.path.exists(os.path.join(args.data_dir, 'stl10_binary'))), transform=torchvision.transforms.Compose([torchvision.transforms.Resize(64),torchvision.transforms.ToTensor()]))
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
