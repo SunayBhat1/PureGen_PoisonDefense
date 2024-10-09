@@ -1,18 +1,17 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
+import numpy as np
+import time
+import os
 import torchvision
 import torchvision.transforms as transforms
 from torchvision.datasets import *
 import torch.utils.data as data
-import random
-import numpy as np
-import time
-import os
 from tqdm import tqdm
 import pickle
 from PIL import Image
-
+import torch.nn.functional as F
+import random
 
 try: import torch_xla.core.xla_model as xm
 except: pass
@@ -24,6 +23,8 @@ from utils.clf_models import load_model
 #############
 
 # Normalizations
+# cifar_mean = (0.4914, 0.4822, 0.4465)
+# cifar_std = (0.2023, 0.1994, 0.2010)
 cifar_mean = (0.4914, 0.4822, 0.4465)
 cifar_std = (0.2471, 0.2435, 0.2616)
 
@@ -1041,7 +1042,10 @@ def get_optimizer(args,target_net):
                 optimizer = torch.optim.SGD(target_net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
         elif args.optim == 'adam':
-            optimizer = torch.optim.Adam(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+            optimizer = torch.optim.Adam(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.999))
+        
+        elif args.optim == 'adamw':
+            optimizer = torch.optim.AdamW(target_net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
         elif args.optim == 'sgd_gm':
             no_decay = ['bias', 'bn']
@@ -1083,7 +1087,11 @@ def get_scheduler(args,optimizer,len_data):
         if args.verbose: print(f'Loaded the HLB scheduler with {total_train_steps} steps')
 
     else:
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay, gamma=0.1)
+        if args.sched == 'step':
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_decay, gamma=0.1)
+        elif args.sched == 'cosine':
+            base_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len_data, eta_min=1e-5)
+            scheduler = warmup_scheduler.GradualWarmupScheduler(optimizer, multiplier=1., total_epoch=5, after_scheduler=base_scheduler)
 
     return scheduler
 

@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 import math
+from einops import rearrange
 
 
 def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,img_size=32):
@@ -22,6 +23,12 @@ def load_model(model_name, num_classes=10, eval_bn=False, grad_bn=False,img_size
         model = MobileNetV2(num_classes=num_classes)
     elif model_name == 'DenseNet121':
         model = densenet_cifar(growth_rate=32)
+    elif model_name == 'NFNet':
+        model = NFNet(BasicBlock, [2, 2, 2], num_classes=num_classes)
+    elif model_name == 'ViT':
+        # model = Transformer(n_layers=12, enc_dim=768, n_heads=12, n_empty_registers=10, dropout_rate=0.1, output_dim=10)
+        # model = Transformer(n_layers=6, enc_dim=384, n_heads=6, n_empty_registers=10, dropout_rate=0.1, output_dim=10)
+        model = ViT(in_c=3, num_classes= 10, img_size=32, patch=16, dropout=0.0, num_layers=7, hidden=384, head=12, mlp_hidden=384, is_cls_token=False)
     else:
         raise ValueError('Unknown model: {}'.format(model_name))
 
@@ -636,6 +643,133 @@ class DenseNet(nn.Module):
         self.linear.bias.data.zero_()
 
 ################
+# NFNet #
+################
+
+class VPGELU(nn.Module):
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        return F.gelu(input) * 1.7015043497085571
+
+class WSConv2D(nn.Conv2d):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size, stride=1, padding=0,
+                 dilation=1, groups: int = 1, bias: bool = True, padding_mode: str = 'zeros'):
+
+        super(WSConv2D, self).__init__(in_channels, out_channels, kernel_size, stride, padding,
+                                      dilation, groups, bias, padding_mode)
+
+        nn.init.xavier_normal_(self.weight)
+        self.gain = nn.Parameter(torch.ones(self.out_channels, 1, 1, 1))
+        self.register_buffer('eps', torch.tensor(1e-4, requires_grad=False), persistent=False)
+        self.register_buffer('fan_in',
+                             torch.tensor(np.prod(self.weight.shape[1:]), requires_grad=False).type_as(self.weight),
+                             persistent=False)
+
+    def standardized_weights(self):
+        mean = torch.mean(self.weight, axis=[1, 2, 3], keepdims=True)
+        var = torch.var(self.weight, axis=[1, 2, 3], keepdims=True)
+        scale = torch.rsqrt(torch.maximum(var * self.fan_in, self.eps))
+        return (self.weight - mean) * scale * self.gain
+
+    def forward(self, x):
+        return F.conv2d(
+            input=x,
+            weight=self.standardized_weights(),
+            bias=self.bias,
+            stride=self.stride,
+            padding=self.padding,
+            dilation=self.dilation,
+            groups=self.groups
+        )
+
+class BasicBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride):
+        super(BasicBlock, self).__init__()
+
+        self.conv1 = WSConv2D(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.gelu = VPGELU()
+        self.conv2 = WSConv2D(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.stride = stride
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.gelu(out)
+
+        out = self.conv2(out)
+
+        if self.stride != 1 or identity.size(1) != out.size(1):
+            identity = nn.functional.conv2d(identity, self.conv1.weight, stride=self.stride, padding=1)
+
+        out += identity
+        out = self.gelu(out)
+
+        return out
+
+class FastGlobalMaxPooling(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        # Previously was chained torch.max calls.
+        # requires less time than AdaptiveMax2dPooling -- about ~.3s for the entire run, in fact (which is pretty significant! :O :D :O :O <3 <3 <3 <3)
+        return torch.amax(x, dim=(2,3)) # Global maximum pooling
+class NFNet(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super(NFNet, self).__init__()
+
+        self.in_channels = 16
+
+        self.conv1 = WSConv2D(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.gelu = VPGELU()
+
+        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))#FastGlobalMaxPooling()#
+        self.fc = nn.Linear(64, num_classes)
+
+    def _make_layer(self, block, out_channels, num_blocks, stride):
+        strides = [stride] + [1] * (num_blocks - 1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_channels, out_channels, stride))
+            self.in_channels = out_channels
+        return nn.Sequential(*layers)
+
+    def penultimate(self, x):
+        out = self.conv1(x)
+        out = self.gelu(out)
+
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+
+        out = self.avg_pool(out)
+        out = out.view(out.size(0), -1)
+
+        return out
+
+    def get_penultimate_params_list(self):
+        return [param for name, param in self.named_parameters() if 'fc' in name]
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.gelu(out)
+
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+
+        out = self.avg_pool(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+
+        return out
+
+
+################
 # ResNet18_HLB #
 ################
 
@@ -786,6 +920,7 @@ class HLB_ConvGroup(nn.Module):
         return x
 
 #### Network Definition ###
+
 def make_hlb_net(hlb_type='HLB_S'):
 
     hlb_args = {
@@ -828,3 +963,186 @@ def make_hlb_net(hlb_type='HLB_S'):
         HLB_Mul(hlb_args['scaling_factor']),
     )
     return net
+
+################
+# ViT Small   #
+################
+
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(self, feats:int, head:int=8, dropout:float=0.):
+        super(MultiHeadSelfAttention, self).__init__()
+        self.head = head
+        self.feats = feats
+        self.sqrt_d = self.feats**0.5
+
+        self.q = nn.Linear(feats, feats)
+        self.k = nn.Linear(feats, feats)
+        self.v = nn.Linear(feats, feats)
+
+        self.o = nn.Linear(feats, feats)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        b, n, f = x.size()
+        q = self.q(x).view(b, n, self.head, self.feats//self.head).transpose(1,2)
+        k = self.k(x).view(b, n, self.head, self.feats//self.head).transpose(1,2)
+        v = self.v(x).view(b, n, self.head, self.feats//self.head).transpose(1,2)
+
+        score = F.softmax(torch.einsum("bhif, bhjf->bhij", q, k)/self.sqrt_d, dim=-1) #(b,h,n,n)
+        attn = torch.einsum("bhij, bhjf->bihf", score, v) #(b,n,h,f//h)
+        o = self.dropout(self.o(attn.flatten(2)))
+        return o
+
+class TransformerEncoder(nn.Module):
+    def __init__(self, feats:int, mlp_hidden:int, head:int=8, dropout:float=0.):
+        super(TransformerEncoder, self).__init__()
+        self.la1 = nn.LayerNorm(feats)
+        self.msa = MultiHeadSelfAttention(feats, head=head, dropout=dropout)
+        self.la2 = nn.LayerNorm(feats)
+        self.mlp = nn.Sequential(
+            nn.Linear(feats, mlp_hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(mlp_hidden, feats),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+
+    def forward(self, x):
+        out = self.msa(self.la1(x)) + x
+        out = self.mlp(self.la2(out)) + out
+        return out
+
+class ViT(nn.Module):
+    def __init__(self, in_c:int=3, num_classes:int=10, img_size:int=32, patch:int=8, dropout:float=0., num_layers:int=7, hidden:int=384, mlp_hidden:int=384*4, head:int=8, is_cls_token:bool=True):
+        super(ViT, self).__init__()
+        # hidden=384
+
+        self.patch = patch # number of patches in one row(or col)
+        self.is_cls_token = is_cls_token
+        self.patch_size = img_size//self.patch
+        f = (img_size//self.patch)**2*3 # 48 # patch vec length
+        num_tokens = (self.patch**2)+1 if self.is_cls_token else (self.patch**2)
+
+        self.emb = nn.Linear(f, hidden) # (b, n, f)
+        self.cls_token = nn.Parameter(torch.randn(1, 1, hidden)) if is_cls_token else None
+        self.pos_emb = nn.Parameter(torch.randn(1,num_tokens, hidden))
+        enc_list = [TransformerEncoder(hidden,mlp_hidden=mlp_hidden, dropout=dropout, head=head) for _ in range(num_layers)]
+        self.enc = nn.Sequential(*enc_list)
+        self.fc = nn.Sequential(
+            nn.LayerNorm(hidden),
+            nn.Linear(hidden, num_classes) # for cls_token
+        )
+
+
+    def forward(self, x):
+        out = self._to_words(x)
+        out = self.emb(out)
+        if self.is_cls_token:
+            out = torch.cat([self.cls_token.repeat(out.size(0),1,1), out],dim=1)
+        out = out + self.pos_emb
+        out = self.enc(out)
+        if self.is_cls_token:
+            out = out[:,0]
+        else:
+            out = out.mean(1)
+        oto_words(self, x):
+        """
+        (b, c, h, w) -> (b, n, f)
+        """
+        out = rearrange(x, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=self.patch_size, p2=self.patch_size)
+        out = out.reshape(x.size(0), self.patch**2 ,-1)
+        return outut = self.fc(out)
+        return out
+
+    def _
+
+################
+# ViT Inital   #
+################
+
+class LearnablePositionalEncoding(nn.Module):
+    def __init__(self, max_len, d_model):
+        super().__init__()
+        self.pe = nn.Parameter(torch.zeros(max_len, d_model))
+        nn.init.normal_(self.pe, std=0.02)
+
+    def forward(self, x):
+        return x + self.pe[:x.size(1)].unsqueeze(0)
+
+class SwiGLU(nn.Module):
+    def forward(self, x):
+        x, gates = torch.chunk(x, 2, dim=-1)
+        return x * F.silu(gates)
+
+class TransformerBlock(nn.Module):
+    def __init__(self, d_model, n_heads, dropout_rate=0.0):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(d_model, elementwise_affine=False)
+        self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout_rate, bias=False, batch_first=True)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.norm2 = nn.LayerNorm(d_model, elementwise_affine=False)
+        self.ff = nn.Sequential(
+            nn.Linear(d_model, d_model * 8, bias=False),
+            SwiGLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(d_model * 4, d_model, bias=False),
+            nn.Dropout(dropout_rate)
+        )
+        self.att_bias = nn.Parameter(torch.zeros(d_model))
+
+    def forward(self, x, is_training=True):
+        x2 = self.norm1(x)
+        x2, _ = self.self_attn(x2, x2, x2)
+        x2 = x2 + self.att_bias.unsqueeze(0).unsqueeze(0)
+        x2 = self.dropout(x2)
+        x = x + x2
+
+        x2 = self.norm2(x)
+        x2 = self.ff(x2)
+        x = x + x2
+
+        return x
+
+class Transformer(nn.Module):
+    def __init__(self, n_layers, enc_dim, n_heads, n_empty_registers, dropout_rate=0.0, output_dim=10):
+        super().__init__()
+        self.n_layers = n_layers
+        self.enc_dim = enc_dim
+        self.n_empty_registers = n_empty_registers
+
+        self.patch_embed = nn.Linear(4 * 4 * 3, enc_dim, bias=False)
+        self.pos_embed = LearnablePositionalEncoding(256 + n_empty_registers, enc_dim)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, enc_dim))
+        if n_empty_registers > 0:
+            self.registers = nn.Parameter(torch.randn(1, n_empty_registers, enc_dim) / math.sqrt(enc_dim))
+
+        self.transformer_blocks = nn.ModuleList([
+            TransformerBlock(enc_dim, n_heads, dropout_rate) for _ in range(n_layers)
+        ])
+
+        self.norm = nn.LayerNorm(enc_dim, elementwise_affine=False)
+        self.fc = nn.Linear(enc_dim, output_dim, bias=False)
+
+    def forward(self, x, is_training=True):
+        x = rearrange(x, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=4, p2=4)
+        x = self.patch_embed(x)
+        x = x * math.sqrt(self.enc_dim)
+        x = self.pos_embed(x)
+        x = self.dropout(x)
+
+        cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+
+        if self.n_empty_registers > 0:
+            empty_registers = self.registers.expand(x.shape[0], -1, -1)
+            x = torch.cat((x, empty_registers), dim=1)
+
+        for block in self.transformer_blocks:
+            x = block(x, is_training)
+
+        x = self.norm(x[:, 0])
+        x = self.fc(x)
+
+        return x
