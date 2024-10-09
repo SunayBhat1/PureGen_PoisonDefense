@@ -238,6 +238,16 @@ class PureDefense:
             self.DM = UNet2DModel.from_pretrained('google/ddpm-cifar10-32')
 
             self.scheduler = DDPMScheduler.from_pretrained('google/ddpm-cifar10-32')
+
+        elif diff_type == 'HF_DDPM_BUTTER32':
+            self.DM = UNet2DModel.from_pretrained('johnowhitaker/ddpm-butterflies-32px')
+
+            self.scheduler = DDPMScheduler.from_pretrained('johnowhitaker/ddpm-butterflies-32px')
+        elif diff_type == 'HF_DDPM_ANIME32':
+            self.DM = UNet2DModel.from_pretrained('onragi/anime-ddpm-32-res2-v3')
+
+            self.scheduler = DDPMScheduler.from_pretrained('onragi/anime-ddpm-32-res2-v3')
+            
         else:
 
             # Create the Differential model
