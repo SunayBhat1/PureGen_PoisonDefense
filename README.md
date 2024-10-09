@@ -1,5 +1,7 @@
 # [PureGEN: Universal Data Purification for Train-Time Poison Defense via Generative Model Dynamics](https://arxiv.org/abs/2405.18627)
 
+*Accepted NeurIPS 2024*
+
 See our [paper on arXiv](https://arxiv.org/abs/2405.18627), (as well as [PureEBM](https://arxiv.org/abs/2405.19376), *a subset work with more details on EBM poison defense*) 
 
 ## Introduction
