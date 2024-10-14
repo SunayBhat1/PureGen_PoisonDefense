@@ -335,8 +335,11 @@ if __name__ == '__main__':
     start_time = time.time()
 
     num_classifiers = poison_num_targets[args.poison_mode][args.poison_type]
-    if args.device_type == 'xla' and args.num_proc > 1 and args.selected_indices is None:
-        for args.start_target_index in range(0,num_classifiers,8):
+    if args.device_type == 'xla' and args.num_proc > 1:
+        if args.start_target_index is None:
+            for args.start_target_index in range(0,num_classifiers,8):
+                xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
+        else:
             xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
     else:
         for args.start_target_index in range(0,1):
