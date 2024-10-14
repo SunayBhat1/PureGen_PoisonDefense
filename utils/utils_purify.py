@@ -52,7 +52,14 @@ def save_poisons(args,poison_tuple_list, poison_indices, target, data_key):
     if args.poison_type == 'GradientMatching':
         save_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
-        save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        if args.narc_type == 'None':
+            save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        elif args.narc_type == 'EBM_Both':
+            save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus_EBM_Both/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        elif args.narc_type == 'EBM_Gen':
+            save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus_EBM_Gen/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        elif args.narc_type == 'EBM_Surrogate':
+            save_dir = os.path.join(args.data_dir, subfolder, f'Narcissus_EBM_Surrogate/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
         save_dir = os.path.join(args.data_dir, subfolder, f'BullseyePolytope/imgs={args.num_images_bp}_iters={args.iters_bp}_repeat={args.net_repeat_bp}')
     elif args.poison_type == 'BullseyePolytope_Bench':
@@ -98,7 +105,17 @@ def get_poisons(args,target_index):
                 poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
             else:
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                if args.narc_type == 'None':
+                    poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                                                                                        args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
+                elif args.narc_type == 'EBM_Both':
+                    poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus_EBM_Both/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                                                                                        args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
+                elif args.narc_type == 'EBM_Gen':
+                    poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus_EBM_Gen/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                                                                                        args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
+                elif args.narc_type == 'EBM_Surrogate':
+                    poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus_EBM_Surrogate/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
         elif args.poison_mode == 'fine_tune_transfer':
             poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 

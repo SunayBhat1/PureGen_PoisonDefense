@@ -1115,7 +1115,14 @@ def load_poisons(args,target_index):
     if args.poison_type == 'GradientMatching':
         load_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
     elif args.poison_type == 'Narcissus':
-        load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        if args.narc_type == 'None':
+            load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        elif args.narc_type == 'EBM_Both':
+            load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus_EBM_Both/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        elif args.narc_type == 'EBM_Gen':
+            load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus_EBM_Gen/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
+        elif args.narc_type == 'EBM_Surrogate':
+            load_dir = os.path.join(args.data_dir, subfolder, f'Narcissus_EBM_Surrogate/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}_num={args.num_images_narcissus}')
     elif args.poison_type == 'BullseyePolytope':
         load_dir = os.path.join(args.data_dir, subfolder, f'BullseyePolytope/imgs={args.num_images_bp}_iters={args.iters_bp}_repeat={args.net_repeat_bp}')
     elif args.poison_type == 'BullseyePolytope_Bench':

@@ -280,6 +280,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', default='HLB_S', type=str, choices=['HLB_S','HLB_M','HLB_L','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','clean','linear_transfer','fine_tune_transfer'],help='mode of attack')
     parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus','NeuralTangent','GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
+    parser.add_argument('--narc_type', default='None', type=str, choices=['None','EBM_Both','EBM_Gen','EBM_Surrogate'],help='type of Narcissus poison to generate')
     parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','JPEG','Epic','Friendly'],help='type of defense to use')
 
     ### EBM Filter Arguments ###
@@ -334,11 +335,11 @@ if __name__ == '__main__':
     start_time = time.time()
 
     num_classifiers = poison_num_targets[args.poison_mode][args.poison_type]
-    if args.device_type == 'xla' and args.num_proc > 1:
+    if args.device_type == 'xla' and args.num_proc > 1 and args.selected_indices is None:
         for args.start_target_index in range(0,num_classifiers,8):
             xmp.spawn(main, args=(args,), nprocs=args.num_proc, join=True, start_method='fork')
     else:
-        for args.start_target_index in range(0,num_classifiers):
+        for args.start_target_index in range(0,1):
             main(0, args)
 
     print(f"Total time taken: {time.time() - start_time}")

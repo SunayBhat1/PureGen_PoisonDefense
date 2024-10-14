@@ -41,7 +41,14 @@ def main(rank, args):
         purify_pbar = True
     else:
         if args.poison_type == 'Narcissus':
-            target_indices = 10
+            if args.narc_type == 'None':
+                target_indices = 10
+            elif args.narc_type == 'EBM_Both':
+                target_indices = 3
+            elif args.narc_type == 'EBM_Gen':
+                target_indices = 3
+            elif args.narc_type == 'EBM_Surrogate':
+                target_indices = 3
         elif args.poison_type == 'GradientMatching':
             target_indices = 100
         elif args.poison_type == 'BullseyePolytope':
@@ -223,6 +230,7 @@ if __name__ == '__main__':
 
     ### Poison Arguments ###
     parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus','GradientMatching','TransferBase','BullseyePolytope','BullseyePolytope_Bench','NeuralTangent'],help='type of poison to generate')
+    parser.add_argument('--narc_type', default='None', type=str, choices=['None','EBM_Both','EBM_Gen','EBM_Surrogate'],help='type of Narcissus poison to generate')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','linear_transfer','fine_tune_transfer'],help='mode of attack')
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')
     parser.add_argument('--noise_eps_narcissus', default=8, type=int, help='epsilon for the noise trigger for Narcissus')
