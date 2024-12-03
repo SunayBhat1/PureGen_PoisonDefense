@@ -16,7 +16,11 @@ import random
 try: import torch_xla.core.xla_model as xm
 except: pass
 
-from utils.clf_models import load_model
+# Add parent directory to sys path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.Classifiers import load_model
 
 #############
 # Variables #
@@ -154,7 +158,7 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device,ebm_mod
 
     # NTG Attack Data
     if args.poison_type == 'NeuralTangent':
-        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG',args.data_key + '.pt'))
+        base_data = torch.load(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'NTG',args.data_key + '.pt'))
         base_data = Simple_Dataset_Base(base_data, transforms=transforms.Compose([transforms.ToTensor()]))
         target_mask_label = None
 
@@ -177,12 +181,12 @@ def get_base_poisoned_dataset(args,target_index, train_transforms,device,ebm_mod
     else:
 
         if args.ebm_filter is not None:
-            unpurified_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Baseline.pt'))
+            unpurified_data = torch.load(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'Baseline.pt'))
 
         if args.poison_mode == 'from_scratch' or args.poison_type == 'BullseyePolytope_Bench':
-            base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,args.data_key + '.pt'))
+            base_data = torch.load(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,args.data_key + '.pt'))
         elif args.poison_mode in ['linear_transfer','fine_tune_transfer']:
-            base_data = torch.load(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase',args.data_key + '.pt'))
+            base_data = torch.load(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'TransferBase',args.data_key + '.pt'))
 
         poison_tuple_list, poison_indices, target_mask_label = load_poisons(args,target_index)
 
@@ -801,15 +805,6 @@ def get_train_transforms(args):
     elif args.poison_mode in ['linear_transfer','fine_tune_transfer'] and args.poison_type == 'BullseyePolytope':
         train_transforms = [transforms.ToTensor()]
 
-    if args.add_rand_noise and args.defense != 'Friendly':
-        if args.verbose: print(f'Adding {args.rand_noise_type} noise with eps {args.rand_noise_eps}')
-        if "uniform" in args.rand_noise_type:
-            train_transforms.append(UniformNoise(eps=args.rand_noise_eps / 255))
-        if "gaussian" in args.rand_noise_type:
-            train_transforms.append(GaussianNoise(eps=args.rand_noise_eps / 255))
-        if "bernoulli" in args.rand_noise_type:
-            train_transforms.append(BernoulliNoise(eps=args.rand_noise_eps / 255))
-
     if args.baseline_defense == 'Friendly':
         if "uniform" in args.friendly_noise_type:
             train_transforms.append(UniformNoise(eps=args.friendly_noise_eps / 255))
@@ -834,7 +829,6 @@ def get_train_transforms(args):
 
     if args.aug_cutout:
         train_transforms.append(Cutout(n_holes=8, length=8))
-        
 
     return transforms.Compose(train_transforms)
 
@@ -1108,7 +1102,7 @@ def load_poisons(args,target_index):
         tuple: A tuple containing the poison data, the indices of the poison data, and the target of the poison attack.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons',args.poison_mode)
+    subfolder = os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'Poisons',args.poison_mode)
 
     if args.poison_type == 'GradientMatching':
         load_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')

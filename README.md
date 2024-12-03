@@ -1,7 +1,5 @@
 # [PureGEN: Universal Data Purification for Train-Time Poison Defense via Generative Model Dynamics](https://arxiv.org/abs/2405.18627)
 
-*Accepted NeurIPS 2024*
-
 See our [paper on arXiv](https://arxiv.org/abs/2405.18627), (as well as [PureEBM](https://arxiv.org/abs/2405.19376), *a subset work with more details on EBM poison defense*) 
 
 ## Introduction
@@ -21,44 +19,77 @@ Train-time data poisoning attacks threaten machine learning models by introducin
 ![PureGen Pipeline](imgs/energy_dists.png)
 
 
-## Installation and Setup
+## Installation and Setup (TPU Node Only)
 
 To install and run this project, follow these steps (currently for TPU with `tpu-vm-pt-2.0` software version)
 
-1. Clone the repository: ```git clone https://github.com/SunayBhat1/PureGen```
-2. Make a Data Directory ```mkdir data``` (modify `--data_dir` if different)
-3. Install the required packages: 
-    - TPU: ```pip install -r requirements_TPU.txt```
-    - GPU: ```pip install -r requirements.txt```
-4. Navigate to the project directory: ```cd PureGen```
-5. [Download poisons](https://drive.google.com/file/d/1ZJUIEGKKhENVSEzOg9WZ2j6s-6Ycrssn/view?usp=sharing), unzip and copy it primary data folder (args.data_dir) under /Poisons (default is /home/<user>/data/Poisons on TPU)
-6. Download pretrained models and store under /<data_dir>/PureGen_Models/
-    - [EBMs](https://drive.google.com/drive/folders/1rA_vHVy9yEzDpxrnExWk5C0LgY0IfoaN?usp=sharing), store in `/<data_dir>/PureGen_Models/EBMSNGAN32/`
-    - [DDPMs](https://drive.google.com/drive/folders/1fC9oh6Sk3EBADw0fr-0SqUq2GYpy5xQN?usp=sharing), store in `/<data_dir>/PureGen_Models/DM_UNET/`
-    - [Pretrained Transfer Models](https://drive.google.com/drive/folders/19NRNos6ywXRnZBSosli_jQhdfb4h5WB9?usp=sharing), store in `/<data_dir>/PureGen_Models/transfer_models/` *if running fine-tune or linear transfer poison scenarios* (credit BullseyePoison see below)
+1. Clone the repository: 
+    ```bash
+    git clone https://github.com/SunayBhat1/PureGen_PoisonDefense
+    ```
+2. Make a Data Directory (modify `--data_dir` arg if different)
+    ```bash
+    mkdir data
+    ``` 
+3. Navigate to the project directory: 
+    ```bash
+    cd PureGen_PoisonDefense
+    ```
+4. Install the required packages: 
+    - TPU: 
+        ```bash
+        pip install -r requirements_TPU.txt
+        ```
+    - GPU (*TBD*)
+6. Download pretrained transfer models and store under /<data_dir>/PureGen_Models/
+    - [Pretrained Transfer Models](https://drive.google.com/drive/folders/1FEhrorad9oREboCevwidrCRduXL8pM26?usp=sharing), store in `/<data_dir>/PureGen_Models/transfer_models/` *if running fine-tune or linear transfer poison scenarios* (credit BullseyePoison see below)
 7. Datasets need to be uploaded to the `data_dir` above
     - CIFAR-10 will auto-download
     - [CIFAR-10 transfer split](https://drive.google.com/file/d/1bU8mz-MuJN2z7ZZjrhSGBmmiDlJpw3GM/view?usp=sharing) (credit BullseyePoison see below)
     - [tiny-imagenet-200](https://www.kaggle.com/datasets/nikhilshingadiya/tinyimagenet200)
     - [CINIC-10](https://datashare.ed.ac.uk/handle/10283/3192)
 
-## Usage
+## Quick Start
 
-### Purification
-
-Purified data will be saved in `/<args.data_dir>/PureGen_PoisonDefense/<args.dataset>` under base dataset or poison path and with a purification `data_key` name
-
-#### No Defense: 
+```bash
+# Set your remote user (for TPU)
+remote_user='your_username';
 ```
-# Purify Full Dataset (w/o poisons)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_model None --diff_model None;
-# Purify Poisoned Samples (Replace with other poison_type if desired)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_model None --diff_model None --poison_type 'Narcissus';
+
+### 1. Train PureGen Models
+
+```bash
+python3 scripts/train_EBM.py --remote_user $remote_user; # Train EBM
+python3 scripts/train_DM.py --remote_user $remote_user; # Train DDPM
 ```
+
+### 2. Purification
+
+Purified data will be saved in `/<args.data_dir>/PureGen_PurifiedData/<args.dataset>` under base dataset or poison path and with a purification `data_key` name
+
+```bash
+# Baseline (no defense)
+python3 scripts/purify.py --remote_user $remote_user;
+python3 scripts/purify.py --remote_user $remote_user --poison_type 'Narcissus';
+# PureGen-EBM defense
+python3 scripts/purify.py --remote_user $remote_user --ebm_model;
+python3 scripts/purify.py --remote_user $remote_user --ebm_model --poison_type 'Narcissus';
+# PureGen-DDPM defense  
+python3 scripts/purify.py --remote_user $remote_user --diff_model;
+python3 scripts/purify.py --remote_user $remote_user --diff_model --poison_type 'Narcissus';
+```
+
+### 3. Train Classifiers with Poisoned and Purified Data
+```bash
+python3 scripts/train_classifier.py --remote_user $remote_user;
+python3 scripts/train_classifier.py --remote_user $remote_user --data_key "EBM[Steps[150]]";
+```
+
+## Additional Configurations
 
 **Poison Modes**:  
     - From Scratch (Default): ```--poison_mode 'from_scratch'```  
-    - Transfer Base Dataset (CIFAR-10 only) ```--poison_type 'TransferBase'```  
+    - Transfer Base Dataset (CIFAR-10 only): ```--poison_type 'TransferBase'```  
     - Linear Transfer: ```--poison_mode 'linear_transfer'```  
     - Fine-Tune Transfer: ```--poison_mode 'fine_tune_transfer'```  
 *Note that both transfer modes use same transfer dataset provided by Bullseye Poison Authors*  
@@ -68,112 +99,40 @@ python3 purify.py --remote_user <TPU_remote_user> --ebm_model None --diff_model 
     - Gradient Matching (Triggerless): ```--poison_type 'GradientMatching'```  
     - Bullseye Polytope (Triggerless): ```--poison_type 'BullseyePolytope'```  
 
-#### EBM Only:
-Modify `--ebm_name` if using another model (Default is CINIC-10 IMagenet Subset trained)
-```bash
-# Purify Full Dataset (w/o poisons)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_lang_steps 150 --diff_model None;
-# Purify Poisoned Samples (Replace with other poison_type if desired)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_lang_steps 150 --diff_model None --poison_type 'Narcissus';
-```
+**Classifier Models**  
+    - HyperLight Benchmark (Default)  
+        -- Small: `--config_overrides 'HLB_SMALL'`  
+        -- Medium: `--config_overrides 'HLB_MEDIUM'`  
+        -- Large: `--config_overrides 'HLB_LARGE'`  
+    - ResNet18 HLB: `--config_overrides 'R18_HLB'`  
+    - MobileNetV2: `--config_overrides 'MOBILE_NET'`  
+    - DenseNet121: `--config_overrides 'DENSE_NET'`  
 
-#### Diffusion Only:
-Modify `--diff_name` if using another model (Default is CINIC-10 IMagenet Subset trained)
-```bash
-# Purify Full Dataset (w/o poisons)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_model None --diff_T 75;
-# Purify Poisoned Samples (Replace with other poison_type if desired)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_model None --diff_T 75 --poison_type 'Narcissus';
-```
+**Training Scenarios**  
+    - Linear Transfer: `--config_overrides 'LINEAR_TRANSFER'`  
+    - Fine-Tune Transfer: `--config_overrides 'FINE_TUNE'`  
+    - 80 Epoch From Scratch: `--config_overrides '80_EPOCH'`  
 
-#### JPEG Compression (Baseline): 
-```bash
-# Purify Full Dataset (w/o poisons)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_model None --diff_model None --jpeg_compression <Compression Ratio>;
-# Purify Poisoned Samples (Replace with other poison_type if desired)
-python3 purify.py --remote_user <TPU_remote_user> --ebm_model None --diff_model None --poison_type 'Narcissus' --jpeg_compression <Compression Ratio>;
-```
+**Baseline Defenses**  
+    - JPEG Compression:  
+        -- Add to `purify.py` `--jpeg_compression <Compression Ratio>` to any of the purify runs (typically 75 or 85 for ratio)  
+        -- Add to `train_classifier.py` `--data_key 'JEPG[<Compression Ratio>]'` to any of the train classifier runs (same ratio as purify)   
+    - Friendly Noise:  
+        -- Add to `train_classifier.py` `--baseline_defense 'Friendly'` to any of the train classifier runs  
+    - Epic:  
+        -- Install Submodlib:  
+            ```bash
+            git clone https://github.com/decile-team/submodlib.git;
+            cd submodlib;
+            pip install .;
+            cd ..;
+            rm -rf submodlib;
+            ```    
+        -- Add to `train_classifier.py` `--baseline_defense 'Epic'` to any of the train classifier runs   
 
-### Train Classifiers
-
-Note: Default model is [HyperLight Benchmark](https://github.com/tysam-code/hlb-CIFAR10) *See below for additional model config overrides*
-
-```bash
-# No Defense
-python3 train_classifier.py --remote_user <User for TPU> --data_dir <Path to data folder> --poison_type 'Narcissus' --data_key "Baseline";
-# EBM Defended Dataset
-python3 train_classifier.py --remote_user <User for TPU> --data_dir <Path to data folder> --poison_type 'Narcissus' --data_key "EBM[cinic10_imagenet_ep120_nf32]_Steps[<ebm_lang_steps>]_T[0.0001]";
-# DDPM Defended Dataset
-python3 train_classifier.py --remote_user <User for TPU> --data_dir <Path to data folder> --poison_type 'Narcissus' --data_key "DM_UNET[cinic10_imagenet_DDPM[250]_nf[L]]_T[<diff_T>]";
-```
-
-#### Additonal Modes
-- Linear Transfer: ```--config_overrides 'LINEAR_TRANSFER'```  
-- Fine-Tune Transfer: ```--config_overrides 'FINE_TUNE'```  
-
-#### Addiotnal Classifier Models
-- For ResNet18 add: ```--config_overrides 'ResNet18'```  
-- For MobileNetV2 add: ```--config_overrides 'MOBILE_NET'```  
-- For DenseNet121 add: ```--config_overrides 'DENSE_NET'```  
 
 Additional configuations and parameters can be found in the `Configs/config.ini` file.  
-*Note: `config_overrides` arguments can be chained if desired (execute in order)*
-
-<details>
-<summary>Full command examples</summary>
-
-```bash
-### Purification 
-
-## From Scratch
-
-# Base Dataset (No Defense)
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None;
-# Base Dataset (PureEBM)
-python3 purify.py --remote_user sunaybhat --ebm_lang_steps 150 --diff_model None;
-# Base Dataset (PureDDPM)
-python3 purify.py --remote_user sunaybhat --ebm_model None --diff_T 75;  
-# Base Dataset (JPEG Compression)
-python3 purify.py --remote_user sunaybhat --ebm_model None --diff_model None --jpeg_compression 25;
-
-# Narcissus (No Defense)
-python3 purify.py --remote_user 'sunaybhat' --ebm_model None --diff_model None --poison_type 'Narcissus';
-# Narcissus (PureEBM)
-python3 purify.py --remote_user sunaybhat --ebm_lang_steps 150 --diff_model None --poison_type 'Narcissus';
-# Narcissus (PureDDPM)
-python3 purify.py --remote_user sunaybhat --ebm_model None --diff_T 75 --poison_type 'Narcissus';
-# Narcissus (JPEG Compression)
-python3 purify.py --remote_user sunaybhat --ebm_model None --diff_model None --poison_type 'Narcissus' --jpeg_compression 25; 
-
-# Gradient Matching (No Defense)
-python3 purify.py --remote_user sunaybhat --ebm_model None --diff_model None --poison_type 'GradientMatching';
-
-## Linear Transfer (No Defense)
-# Base Transfer Dataset
-python3 purify.py --remote_user sunaybhat --ebm_model None --diff_model None --poison_type 'TransferBase';
-# Bullseye Poltyope Linear Transfer
-python3 purify.py --remote_user sunaybhat --ebm_model None --diff_model None --poison_mode 'linear_transfer' --poison_type 'BullseyePolytope';
-
-### Classifier Training
-
-## From Scratch Narcissus
-# No Defense
-python3 train_classifier.py --remote_user sunaybhat --poison_type 'Narcissus' --data_key "Baseline";
-# EBM Defended Dataset
-python3 train_classifier.py --remote_user sunaybhat --poison_type 'Narcissus' --data_key "EBM[cinic10_imagenet_nf[128]_Steps[150]_T[0.0001]";
-# DDPM Defended Dataset
-python3 train_classifier.py --remote_user sunaybhat --poison_type 'Narcissus' --data_key "DM_UNET[cifar10_DDPM[250]_nf[L]]_T[15]";
-# No Defense ResNet18
-python3 train_classifier.py --remote_user sunaybhat --poison_type 'Narcissus' --data_key "Baseline" --config_overrides 'ResNet18';
-
-## From Scratch Gradient Matching (No Defense)
-python3 train_classifier.py --remote_user sunaybhat --poison_type 'GradientMatching';
-
-## Linear Transfer Bullseye Polytope (No Defense)
-python3 train_classifier.py --remote_user sunaybhat --config_overrides 'LINEAR_TRANSFER' --poison_type 'BullseyePolytope';
-```
-
-</details>
+*Note: `config_overrides` arguments can be chained if desired, they execute in order*
 
 
 ## Analyze Results

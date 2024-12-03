@@ -3,17 +3,21 @@ import torchvision.transforms as transforms
 import io
 from PIL import Image
 from tqdm import tqdm
-import time
+import os
 
 try: import torch_xla.core.xla_model as xm
 except: pass
 
-from utils.EBM_models import create_ebm
-from utils.Diff_models import create_diff
-from diffusers import UNet2DModel, DDPMScheduler, ScoreSdeVeScheduler
+# Add parent directory to sys path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.EBMs import EBMSNGAN32, create_ebm
+from models.DDPMs import create_diff
+from diffusers import UNet2DModel, DDPMScheduler
 
 
-class PureDefense:
+class PureGen:
     def __init__(self, device, device_type = 'xla',
                  ebm_type=None,ebm_path=None,ebm_nf=128,
                  diff_type=None,diff_path=None, 
@@ -22,6 +26,8 @@ class PureDefense:
                  verbose=True
                  ):
         '''
+        The PureGen class implements data purification techniques using Energy-Based Models (EBMs) and Denoising Diffusion Probabilistic Models (DDPMs) 
+        to defend against data poisoning attacks during training. It loads and manages these models and performs purification on a given dataset (torch data loader).
         '''
 
         # Store Arguments
@@ -187,13 +193,13 @@ class PureDefense:
 
         return torch.stack(batch)
 
-    def get_ebm(self, ebm_type, ebm_path, nf=128, verbose=True):
+    def get_ebm(self, ebm_path, HF_Pretrained=True, nf=128, verbose=True):
         """
         Loads an Energy-Based Model (EBM) from a specified path.
 
         Parameters:
-        ebm_type (str): The name of the EBM model to be created.
-        ebm_path (str): The path where the EBM model's state dictionary is stored.
+        ebm_path (str): The path where the EBM model's state dictionary is stored (Hugging Face or Local Path)
+        HF_Pretrained (bool, optional): If True, loads the model from Hugging Face. Defaults to True.
         nf (int, optional): The number of filters in the EBM model. Defaults to 128.
         verbose (bool, optional): If True, prints a message confirming the successful loading of the model. Defaults to True.
 
@@ -201,13 +207,18 @@ class PureDefense:
         None. The method directly modifies the `self.EBM` attribute of the class instance.
         """
 
-        # Create the EBM model
-        self.EBM = create_ebm(ebm_type, nf)
-        self.ebm_type = ebm_type
+        if HF_Pretrained is True:
 
-        # Load the state dictionary of the EBM model
-        state_dict = torch.load(ebm_path, map_location=torch.device('cpu'))
-        self.EBM.load_state_dict(state_dict)
+            self.EBM = EBMSNGAN32.from_pretrained(ebm_path)
+
+        else:
+
+            # Create the EBM model
+            self.EBM = create_ebm('EBMSNGAN32', nf)
+
+            # Load the state dictionary of the EBM model
+            state_dict = torch.load(ebm_path, map_location=torch.device('cpu'))
+            self.EBM.load_state_dict(state_dict)
 
         # Move the EBM model to the device
         self.EBM = self.EBM.to(self.device)
@@ -215,44 +226,34 @@ class PureDefense:
 
         if verbose:
             num_params = sum(p.numel() for p in self.EBM.parameters() if p.requires_grad)
-            print(f'Loaded {ebm_type} from {ebm_path} with {num_params} parameters')
+            print(f'Loaded EBM (SNGAN32) from {ebm_path} with {num_params} parameters')
     
-    def get_diff(self, diff_type, diff_path,
-                 unet_channels=(32, 32, 64, 64, 128, 128),nf=64,num_res_blocks=2,
-                  verbose=True): # channels=3,
+    def get_diff(self, diff_path, HF_Pretrained=True, 
+                 unet_channels=(32, 32, 64, 64, 128, 128), nf=64,
+                  verbose=True):
         """
         Loads a Differential Model from a specified path.
 
         Parameters:
-        diff_type (str): The name of the Differential model to be created.
-        diff_path (str): The path where the Differential model's state dictionary is stored.
-        nf (int, optional): The number of filters in the Differential model. Defaults to 128.
-        img_sz (int, optional): The size of the input images. Defaults to 32.
+        diff_path (str): The path where the Differential model's state dictionary is stored (Hugging Face or Local Path)
+        HF_Pretrained (bool, optional): If True, loads the model from Hugging Face. Defaults to True.
+        unet_channels (tuple, optional): The number of channels in the UNet model. Defaults to (32, 32, 64, 64, 128, 128).
+        nf (int, optional): The number of filters in the Differential model. Defaults to 64.
         verbose (bool, optional): If True, prints a message confirming the successful loading of the model. Defaults to True.
 
         Returns:
         None. The method directly modifies the `self.Diff` attribute of the class instance.
         """
 
-        if diff_type == 'HF_DDPM_PRE':
-            self.DM = UNet2DModel.from_pretrained('google/ddpm-cifar10-32')
+        if HF_Pretrained is True:
 
-            self.scheduler = DDPMScheduler.from_pretrained('google/ddpm-cifar10-32')
-
-        elif diff_type == 'HF_DDPM_BUTTER32':
-            self.DM = UNet2DModel.from_pretrained('johnowhitaker/ddpm-butterflies-32px')
-
-            self.scheduler = DDPMScheduler.from_pretrained('johnowhitaker/ddpm-butterflies-32px')
-        elif diff_type == 'HF_DDPM_ANIME32':
-            self.DM = UNet2DModel.from_pretrained('onragi/anime-ddpm-32-res2-v3')
-
-            self.scheduler = DDPMScheduler.from_pretrained('onragi/anime-ddpm-32-res2-v3')
+            self.DM = UNet2DModel.from_pretrained(diff_path)
+            self.scheduler = DDPMScheduler(num_train_timesteps=1000)
             
         else:
 
             # Create the Differential model
-            self.DM = create_diff(diff_type, unet_channels, nf, num_res_blocks=num_res_blocks)
-            self.diff_type = diff_type
+            self.DM = create_diff('DM_UNET', unet_channels, nf, num_res_blocks=2)
 
             # Load the state dictionary of the Diffusion model
             state_dict = torch.load(diff_path, map_location=torch.device('cpu'))
@@ -267,4 +268,4 @@ class PureDefense:
 
         if verbose:
             num_params = sum(p.numel() for p in self.DM.parameters() if p.requires_grad)    
-            print(f'Loaded {diff_type} from {diff_path} with {num_params} parameters')
+            print(f'Loaded DDPM from {diff_path} with {num_params} parameters')

@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 import torch.utils.data as data
 from tqdm import tqdm
 import pickle
+from huggingface_hub import snapshot_download
 
 import torch.nn.functional as F
 import random
@@ -18,6 +19,12 @@ except: pass
 # Used for denormalizing poisons
 cifar_mean = (0.4914, 0.4822, 0.4465)
 cifar_std = (0.2023, 0.1994, 0.2010)
+
+
+def download_poisons(data_root):
+    local_dir = os.path.join(data_root, 'PureGen_Poisons')
+    if not os.path.exists(local_dir):
+        snapshot_download(repo_id='SunayBhat1/puregen-poisons', repo_type='dataset', local_dir=local_dir, local_dir_use_symlinks=False)
 
 
 class ImageListDataset(data.Dataset):
@@ -47,7 +54,7 @@ def save_poisons(args,poison_tuple_list, poison_indices, target, data_key):
         str: The path to the saved file.
     """
 
-    subfolder = os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'Poisons',args.poison_mode)
+    subfolder = os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'Poisons',args.poison_mode)
     # Create the directory if it doesn't exist
     if args.poison_type == 'GradientMatching':
         save_dir = os.path.join(args.data_dir, subfolder, 'GradientMatching')
@@ -80,9 +87,9 @@ def get_poisons(args,target_index):
     
     if args.poison_type == 'GradientMatching':
         if args.dataset == 'cifar10':
-            poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/GradientMatching/',args.dataset,f'{target_index}'))
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'PureGen_Poisons/GradientMatching/',args.dataset,f'{target_index}'))
         elif args.dataset == 'tinyimagenet':
-            poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'Poisons/GradientMatching/',args.dataset,'ResNet34_250',f'{target_index}'))
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_GM(os.path.join(args.data_dir,f'PureGen_Poisons/GradientMatching/',args.dataset,'ResNet34_250',f'{target_index}'))
         else:
             raise ValueError(f"Dataset {args.dataset} not supported for Gradient Matching attack.")
 
@@ -95,13 +102,13 @@ def get_poisons(args,target_index):
             if args.dataset == 'stl10':
                 # Map stl classes to cifar classes
                 stl_cifar_label_map = {0: 0, 1: 2, 2: 1, 3: 3, 4: 4, 5: 5, 6: 7, 7: 6, 8: 8, 9: 9}
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
+                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'PureGen_Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{stl_cifar_label_map[target_index]}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
             else:
-                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+                poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'PureGen_Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         args.data_dir, args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list)
         elif args.poison_mode == 'fine_tune_transfer':
-            poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
+            poison_tuple_list, poison_indices, target = get_poisoned_subset_narcissus(os.path.join(args.data_dir,f'PureGen_Poisons/Narcissus/{args.dataset}/size={args.noise_sz_narcissus}_eps={args.noise_eps_narcissus}/best_noise_lab{target_index}.npy'), 
                                                                                         os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'), args.dataset, target_index, args.num_images_narcissus, not args.random_imgs_narcissus, index_list=None, transfer_subset=True)
             
         else:
@@ -121,7 +128,7 @@ def get_poisons(args,target_index):
 
         # Load the poison
         bp_poison = torch.load(os.path.join(args.data_dir, \
-                        f'Poisons/Bullseye_Polytope/{args.dataset}/attack-results-{args.num_images_bp}poisons/100-overlap/{bp_subpath}/{args.iters_bp}/{target_index}/poison_{args.iters_bp-1:05d}.pth'),map_location=torch.device('cpu'))
+                        f'PureGen_Poisons/Bullseye_Polytope/{args.dataset}/attack-results-{args.num_images_bp}poisons/100-overlap/{bp_subpath}/{args.iters_bp}/{target_index}/poison_{args.iters_bp-1:05d}.pth'),map_location=torch.device('cpu'))
         
         poison_tuple_list, poison_indices = bp_poison['poison'], bp_poison['idx']
 
@@ -134,9 +141,9 @@ def get_poisons(args,target_index):
     elif args.poison_type == 'BullseyePolytope_Bench':
             
         # Load the poison
-        with open(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'poisons.pickle'), "rb") as handle: 
+        with open(os.path.join(args.data_dir,f'PureGen_Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'poisons.pickle'), "rb") as handle: 
             poison_tuple_list = pickle.load(handle)
-        with open(os.path.join(args.data_dir,f'Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'base_indices.pickle'), "rb") as handle: 
+        with open(os.path.join(args.data_dir,f'PureGen_Poisons/Transfer_Bench/bp_poisons/num_poisons={args.num_images_bp}/{target_index}', 'base_indices.pickle'), "rb") as handle: 
             poison_indices = pickle.load(handle)
 
         target = poison_tuple_list[0][1]
@@ -269,7 +276,7 @@ def process_args(args, rank):
     Function to process the arguments for distributed training
     '''
     # List of argument names to process
-    arg_names = ['ebm_lang_steps', 'ebm_lang_temp', 'diff_T','ebm_name','diff_name','ebm_nf','diff_nf','num_images_narcissus','jpeg_compression','purify_reps']
+    arg_names = ['ebm_lang_steps', 'diff_T','ebm_nf','num_images_narcissus','jpeg_compression','purify_reps']
 
     for arg_name in arg_names:
         arg_value = getattr(args, arg_name)
