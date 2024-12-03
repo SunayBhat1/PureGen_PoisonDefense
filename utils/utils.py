@@ -7,8 +7,8 @@ import json
 import glob
 
 
-from utils.clf_models import load_model
-from utils.utils_clf import *
+from models.Classifiers import load_model
+from utils.classifier import *
 
 try: import torch_xla.core.xla_model as xm
 except: pass

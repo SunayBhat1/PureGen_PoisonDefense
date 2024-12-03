@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from huggingface_hub import PyTorchModelHubMixin
 
 # Define the create_net function
 def create_ebm(net_type, num_filters, num_channels = 3, patch_size=1):
@@ -30,7 +31,7 @@ def create_ebm(net_type, num_filters, num_channels = 3, patch_size=1):
 # ## EBM ## #
 #########################
 
-class EBM(nn.Module):
+class EBM(nn.Module,PyTorchModelHubMixin):
     def __init__(self, n_c=3, n_f=32, leak=0.05):
         super(EBM, self).__init__()
         self.f = nn.Sequential(
@@ -285,7 +286,7 @@ class DBlockOptimized(nn.Module):
         """
         return self._residual(x) + self._shortcut(x)
 
-class EBMSNGAN32(nn.Module):
+class EBMSNGAN32(nn.Module,PyTorchModelHubMixin):
     r"""
     ResNet backbone discriminator for SNGAN.
 

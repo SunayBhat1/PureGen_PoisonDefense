@@ -1,15 +1,9 @@
 import os
-import json
 import argparse
 import configparser
 import time
 from tqdm import tqdm
-import sys
 
-import numpy as np
-import pandas as pd
-import torchvision.transforms as transforms
-import torchvision
 import torch
 import torch.nn as nn
 
@@ -18,10 +12,14 @@ try:
     import torch_xla.distributed.xla_multiprocessing as xmp
 except: pass
 
+# Add parent directory to sys path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils.utils import *
-from utils.utils_clf import *
-from utils.utils_baselines import *
-from utils.EBM_models import create_ebm
+from utils.classifier import *
+from utils.defense_baselines import *
+from models.EBMs import EBMSNGAN32
 
 
 def main(rank, args):
@@ -48,9 +46,7 @@ def main(rank, args):
     ######################
 
     if args.ebm_filter is not None:
-        ebm_model = create_ebm('EBMSNGAN32',128)
-        ebm_model.load_state_dict(torch.load(os.path.join(args.data_dir,args.ebm_path)))
-        ebm_model.to(device)
+        ebm_model = EBMSNGAN32.from_pretrained(args.ebm_path).to(device)
     else:
         ebm_model = None
 
@@ -267,26 +263,26 @@ if __name__ == '__main__':
     ### Setup Arguments ###
     parser.add_argument('--remote_user', type=str, help='username for the remote server (TPU only, else pass in full directory args below)')
     parser.add_argument('--num_proc', type=int, default=8, help='number of processes for TPU')
-    parser.add_argument('--config_file', default='./Configs/config.ini', type=str, help='path to the config file')
+    parser.add_argument('--config_file', default='./configs/config.ini', type=str, help='path to the config file')
     parser.add_argument('--config_overrides', default=None, nargs='+', type=str, help='Config Overrides (will execute in order)')
     parser.add_argument('--exp_name', default=None, type=str,help='name of the experiment to append to the output dataframe')
+    parser.add_argument('--data_dir', default='/home/data', type=str, help='path to the data directory')
+    parser.add_argument('--output_dir', default='/home/PureGen_Results', type=str, help='path to the output directory')
     parser.add_argument('--start_target_index', default=0, type=int,help='start label for the attack (only used for from_scratch attacks)')
     parser.add_argument('--selected_indices', default=None, nargs='+', type=int, help='Specific indices to run the attack on each TPU core (default: None, TPU only!!!)')
     parser.add_argument('--verbose','--v', default=False, action='store_true',help='print out additional information when running')
-    parser.add_argument('--data_dir', default='/home/data/', type=str, help='path to the data directory')
-    parser.add_argument('--output_dir', default='/home/results_PureGen_PoisonDefense/', type=str, help='path to the output directory')
 
     ### Experiment Arguments ###
     parser.add_argument('--dataset', default='cifar10', type=str, choices=['cifar10','cinic10','stl10','tinyimagenet'],help='dataset to use')
     parser.add_argument('--data_key', default='Baseline', type=str, help='key for the purified or baseline data')
-    parser.add_argument('--model', default='HLB_S', type=str, choices=['HLB_S','HLB_M','HLB_L','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121','ViT'],help='type of model to use')
+    parser.add_argument('--model', default='ResNet18', type=str, choices=['HLB_S','HLB_M','HLB_L','ResNet18_HLB','ResNet18','ResNet34','MobileNetV2','DenseNet121'],help='type of model to use')
     parser.add_argument('--poison_mode', default='from_scratch', type=str, choices=['from_scratch','clean','linear_transfer','fine_tune_transfer'],help='mode of attack')
     parser.add_argument('--poison_type', default='Narcissus', type=str, choices=['Narcissus','NeuralTangent','GradientMatching','BullseyePolytope','BullseyePolytope_Bench'],help='type of poison to generate')
-    parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','JPEG','Epic','Friendly'],help='type of defense to use')
+    parser.add_argument('--baseline_defense', default='None', type=str, choices=['None','Epic','Friendly'],help='type of defense to use')
 
     ### EBM Filter Arguments ###
     parser.add_argument('--ebm_filter', default=None, type=float, help='EBM highest energy % to purify')
-    parser.add_argument('--ebm_path', default='PureGen_Models/EBMSNGAN32/cinic10_imagenet_nf[128].pt', type=str, help='path to the EBM model')
+    parser.add_argument('--ebm_path', default='SunayBhat1/puregen-ebm-cinic10-imagenet', type=str, help='path to the EBM model (Hugging Face)')
     
     ### Poison Arguments ###
     parser.add_argument('--noise_sz_narcissus', default=32, type=int, help='size of the noise trigger for Narcissus')

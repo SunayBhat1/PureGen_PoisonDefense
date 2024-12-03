@@ -1,19 +1,24 @@
-from PureDefense import PureDefense
+from PureGen import PureGen
 
 import os
 import argparse
-import csv
-import json
 import time
+from tqdm import tqdm
+import torch
+import torchvision
 
 try: 
     import torch_xla.core.xla_model as xm
     import torch_xla.distributed.xla_multiprocessing as xmp
 except: pass
 
-from utils.utils import *
 
-from utils.utils_purify import get_poisons, ImageListDataset, save_poisons, process_args, get_ntg
+# Add parent directory to sys path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.utils import *
+from utils.purification import get_poisons, ImageListDataset, save_poisons, process_args, get_ntg, download_poisons
 
 
 ### Main Function ###
@@ -31,9 +36,9 @@ def main(rank, args):
     
     # Raise errors
     if args.purify_reps > 1 and (args.ebm_model is None or args.diff_model is None):
-        raise ValueError('When purify_reps>1, both EBM and Diffusion models must be provided')
+        raise ValueError('When purify_reps > 1, both EBM and Diffusion models must be provided')
     if args.purify_reps > 1 and (args.ebm_lang_steps == 0 or args.diff_T == 0):
-        raise ValueError('When purify_reps>1, ebm_lang_steps and diff_T must be greater than 0')
+        raise ValueError('When purify_reps > 1, ebm_lang_steps and diff_T must be greater than 0')
 
     # Get the data loader and number of target indices
     if args.poison_type in [None,'NeuralTangent','TransferBase']:
@@ -54,24 +59,15 @@ def main(rank, args):
 
         purify_pbar = False
 
-    # Get diff and ebm model paths
-    if args.ebm_model is not None: ebm_path = os.path.join(args.data_dir,'PureGen_Models',args.ebm_model,args.ebm_name+'.pt')
-    else: ebm_path = None
-    
-    if args.diff_model is None: diff_path = None
-    else: diff_path = os.path.join(args.data_dir,'PureGen_Models',args.diff_model,args.diff_name+'.pt')
+    # Download poisons if they don't exist
+    if args.poison_type is not None:
+        download_poisons(args.data_dir)
 
-    # Get the unet channels
-    if args.unet_channels == 'S': unet_channels = [32, 32, 64, 64, 128, 128]
-    elif args.unet_channels == 'M': unet_channels = [64, 64, 128, 128, 256, 256]
-    elif args.unet_channels == 'L': unet_channels = [128, 128, 256, 256, 512, 512]
-
-    # Create the PureDefense object
-    PurifyClass = PureDefense(device,args.device_type,
-                            ebm_type=args.ebm_model,ebm_path=ebm_path,ebm_nf=args.ebm_nf,                   # EBM Model
-                            diff_type=args.diff_model,diff_path=diff_path,                                  # Diffusion Model
-                            diff_unet_channels=unet_channels,diff_nf=args.diff_nf,                     # Diffusion Model
-                            jpeg_compression=args.jpeg_compression,                                         # JPEG Compression
+    # Create the PureGen object
+    PurifyClass = PureGen(device, args.device_type,
+                            ebm_path=args.ebm_path, ebm_nf=args.ebm_nf,                                              # EBM Model
+                            diff_path=args.diff_path, diff_unet_channels=args.unet_channels,        # Diffusion Model
+                            jpeg_compression=args.jpeg_compression,                                             # JPEG Compression
                             verbose=args.verbose)
     
     if purify_pbar is False and rank == 0:
@@ -97,10 +93,10 @@ def main(rank, args):
                 train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_dir, 'tiny-imagenet-200/train'), transform=torchvision.transforms.ToTensor())
                 train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         elif args.poison_type == 'NeuralTangent':
-            train_data = get_ntg(os.path.join(args.data_dir,'Poisons/NTG'),True, transform=torchvision.transforms.ToTensor())
+            train_data = get_ntg(os.path.join(args.data_dir,'PureGen_Poisons/NTG'),True, transform=torchvision.transforms.ToTensor())
             train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         elif args.poison_type == 'TransferBase':
-            train_data = ImageListDataset(torch.load(os.path.join('/home/sunaybhat/data','CIFAR10_TRAIN_Split.pth'))['others'])
+            train_data = ImageListDataset(torch.load(os.path.join(args.data_dir,'CIFAR10_TRAIN_Split.pth'))['others'])
             train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=False, num_workers=4)
         else:
             poison_tuple_list, poison_indices, target_mask_label = get_poisons(args,args.target_index)
@@ -111,9 +107,9 @@ def main(rank, args):
 
         ### Purify the dataset ###
         start_purify = time.time()
-        purified_data = PurifyClass.purify(train_loader,ebm_lang_steps=args.ebm_lang_steps,ebm_lang_temp=args.ebm_lang_temp,
-                        diff_steps=args.diff_T, reverse_only=args.diff_reverse_only,
-                        purify_reps=args.purify_reps,pbar=purify_pbar)
+        purified_data = PurifyClass.purify(train_loader,ebm_lang_steps=args.ebm_lang_steps,
+                                            diff_steps=args.diff_T,
+                                            purify_reps=args.purify_reps,pbar=purify_pbar)
 
         purify_time = time.time() - start_purify
         
@@ -121,18 +117,10 @@ def main(rank, args):
 
         # Primary Defenses
         data_key = ''
-        if args.ebm_model is not None:
-            data_key += f'{args.ebm_model}[{args.ebm_name}]_Steps[{args.ebm_lang_steps}]_T[{args.ebm_lang_temp}]'
-        if args.diff_model is not None:
-            if args.diff_model == 'HF_DDPM_PRE':
-                data_key += f'HF_DDPM[ddpm-cifar10-32]_T[{args.diff_T}]'
-            elif args.diff_model == 'HF_DDPM_BUTTER32':
-                data_key += f'HF_DDPM[ddpm-butterflies-32px]_T[{args.diff_T}]'
-            elif args.diff_model == 'HF_DDPM_ANIME32':
-                data_key += f'HF_DDPM[ddpm-anime-32]_T[{args.diff_T}]'
-            else:
-                data_key += f'_{args.diff_model}[{args.diff_name.replace("/","_")}]_T[{args.diff_T}]'
-                if args.diff_reverse_only: data_key += '_ReverseOnly'
+        if args.ebm_model:
+            data_key += f'EBM[Steps[{args.ebm_lang_steps}]]'
+        if args.diff_model:
+            data_key += f'_DDPM[T[{args.diff_T}]]'
         if args.jpeg_compression is not None:
             data_key += f'_JPEG[{args.jpeg_compression}]'
         if args.purify_reps > 1: 
@@ -146,22 +134,22 @@ def main(rank, args):
 
         # Save the purified data
         if args.poison_type is None:
-            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset)):
-                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset))
-            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,f'{data_key}.pt'))
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset)):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,f'{data_key}.pt'))
         elif args.poison_type == 'NeuralTangent':
-            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG')):
-                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG'))
-            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'NTG',f'{data_key}.pt'))
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'NTG')):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'NTG'))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'NTG',f'{data_key}.pt'))
         elif args.poison_type == 'TransferBase':
-            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase')):
-                os.makedirs(os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase'))
-            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset,'TransferBase',f'{data_key}.pt'))
+            if not os.path.exists(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'TransferBase')):
+                os.makedirs(os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'TransferBase'))
+            torch.save(purified_data,os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset,'TransferBase',f'{data_key}.pt'))
         else:
             save_dir = save_poisons(args,purified_data, poison_indices, target_mask_label, data_key)
 
         # Save the purify time
-        try: save_purify_time(data_key,purify_time,args,os.path.join(args.data_dir,'PureGen_PoisonDefense',args.dataset))
+        try: save_purify_time(data_key,purify_time,args,os.path.join(args.data_dir,'PureGen_PurifiedData',args.dataset))
         except: pass
 
         if purify_pbar is False and rank == 0:
@@ -204,22 +192,19 @@ if __name__ == '__main__':
 
     # EBM Arguments 
     args_ebm = parser.add_argument_group('EBM')
-    args_ebm.add_argument('--ebm_model', default='EBMSNGAN32', type=none_or_str, choices=[None,'EBM','EBMSNGAN32','EBMSNGAN128','EBMSNGAN256'],help='type of EBM model to use')
-    args_ebm.add_argument('--ebm_name', default='cinic10_imagenet_nf[128]', type=str_or_str_list, help='path to the EBM model including train dataset')
+    args_ebm.add_argument('--ebm_model', action='store_true', help='use EBM model')
+    args_ebm.add_argument('--ebm_path', default='SunayBhat1/puregen-ebm-cinic10-imagenet', type=str_or_str_list, help='path to the EBM model including train dataset')
+    args_ebm.add_argument('--HF_Pretrained_EBM', default=True, action='store_true', help='use HF pretrained EBM')
     args_ebm.add_argument('--ebm_nf', default=128, type=int_or_int_list,  help='number of filters for the ebm model')
     args_ebm.add_argument('--ebm_lang_steps', default=150, type=int_or_int_list, help='number of langevin steps')
-    args_ebm.add_argument('--ebm_lang_temp', default=1e-4, type=float_or_float_list, help='langevin temperature')
 
     # Diffusion Arguments
     args_diff = parser.add_argument_group('Diffusion')
-    args_diff.add_argument('--diff_model', default='DM_UNET', type=none_or_str, choices=[None,'DM_UNET','HF_NCSNPP_PRE','HF_DDPM_PRE','DM_UNET_SMALL','HF_DDPM_BUTTER32','HF_DDPM_ANIME32'],help='type of diffusion model to use')
-    args_diff.add_argument('--diff_name', default='cinic10_imagenet_DDPM[250]_nf[L]', type=str_or_str_list, help='path to the diffusion model')
-    args_diff.add_argument('--unet_channels', default='L', type=str, help='number of channels for the unet model',choices=['S','M','L'])
-    args_diff.add_argument('--diff_nf', default=64, type=int,  help='number of filters for the unet model')
-    args_diff.add_argument('--diff_time_emb_dim', default=64, type=int, help='size of the time embedding')
-    args_diff.add_argument('--num_res_blocks', default=2, type=int, help='number of res blocks in the unet')
-    args_diff.add_argument('--diff_T', default=50, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
-    args_diff.add_argument('--diff_reverse_only', default=False, action='store_true', help='reverse only for the unconditional diffuion model')
+    args_diff.add_argument('--diff_model', action='store_true', help='use diffusion model')
+    args_diff.add_argument('--diff_path', default='SunayBhat1/puregen-ddpm-cinic10-imagenet', type=str_or_str_list, help='path to the diffusion model')
+    args_diff.add_argument('--HF_Pretrained_Diff', default=True, action='store_true', help='use HF pretrained Diffusion')
+    args_diff.add_argument('--unet_channels', default=[128, 128, 256, 256, 512, 512], type=int_or_int_list, help='number of channels for the unet model')
+    args_diff.add_argument('--diff_T', default=75, type=int_or_int_list,  help='number of purify t-steps for the unconditional diffuion model')
 
     ### Poison Arguments ###
     parser.add_argument('--poison_type', default=None, type=str, choices=['Narcissus','GradientMatching','TransferBase','BullseyePolytope','BullseyePolytope_Bench','NeuralTangent'],help='type of poison to generate')

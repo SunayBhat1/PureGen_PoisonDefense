@@ -1,8 +1,11 @@
 # General packages
 numpy==1.22.0
 tqdm
-diffusers==0.26.2
 pillow==9.4.0
+
+# Hugging Face
+huggingface_hub
+diffusers==0.26.2
 
 # Results
 pandas==2.0.1
@@ -15,3 +18,5 @@ nbconvert==7.16.4
 nbformat==5.10.4
 traitlets==5.9.0
 
+# Model Evaluation
+pytorch-fid
